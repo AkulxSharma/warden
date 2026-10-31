@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Warden Wallets</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #ffffff; --ink: #14171c; --muted: #5d6673; --line: #e2e5ea;
+    --good: #0b7a43; --bad: #b3261e; --accent: #2447d6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0f1216; --card: #171b21; --ink: #eef1f5; --muted: #98a2b0; --line: #262c35;
+            --good: #4cc38a; --bad: #ff6b60; --accent: #7b96ff; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 20px; font-size: 14px; }
+  .banner { background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--muted);
+            border-radius: 10px; padding: 14px 16px; margin-bottom: 20px; }
+  .banner.ok { border-left-color: var(--good); }
+  .banner.fail { border-left-color: var(--bad); }
+  .banner b { font-weight: 650; }
+  .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 24px; }
+  @media (max-width: 560px) { .cards { grid-template-columns: 1fr; } }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+  .alias { font-weight: 650; }
+  .role { color: var(--muted); font-size: 13px; }
+  .bal { font-size: 30px; font-weight: 700; margin: 8px 0 2px; font-variant-numeric: tabular-nums; }
+  .addr { font-family: ui-monospace, Menlo, monospace; font-size: 12px; color: var(--muted); word-break: break-all; }
+  h2 { font-size: 16px; margin: 0 0 8px; }
+  table { width: 100%; border-collapse: collapse; background: var(--card); border: 1px solid var(--line);
+          border-radius: 10px; overflow: hidden; font-size: 14px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+  tr:last-child td { border-bottom: 0; }
+  .num { font-variant-numeric: tabular-nums; }
+  .st-confirmed { color: var(--good); font-weight: 600; }
+  .st-failed, .st-blocked { color: var(--bad); font-weight: 600; }
+  tr.blocked td { background: color-mix(in srgb, var(--bad) 8%, transparent); }
+  a { color: var(--accent); }
+  .foot { color: var(--muted); font-size: 12px; margin-top: 14px; }
+  .scroll { overflow-x: auto; }
+  .chat { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px; margin-bottom: 24px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 10px; }
+  .chip { font: inherit; font-size: 13px; padding: 6px 10px; border-radius: 999px; cursor: pointer;
+          border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
+  .chip:hover { border-color: var(--accent); }
+  .msgs { max-height: 280px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+  .msg { padding: 8px 12px; border-radius: 10px; max-width: 92%; white-space: pre-wrap; word-break: break-word; font-size: 14px; }
+  .msg.me { align-self: flex-end; background: var(--accent); color: #fff; }
+  .msg.bot { align-self: flex-start; background: var(--bg); border: 1px solid var(--line); }
+  .msg.refused { border-color: var(--bad); }
+  .msg.wait { color: var(--muted); }
+  #chatForm { display: flex; gap: 8px; }
+  #chatInput { flex: 1; font: inherit; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--line);
+               background: var(--bg); color: var(--ink); min-width: 0; }
+  #chatForm button { font: inherit; padding: 9px 16px; border-radius: 8px; border: 0; cursor: pointer;
+                     background: var(--accent); color: #fff; }
+  .hint { color: var(--muted); font-size: 12px; margin: 8px 0 0; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Warden wallets</h1>
+  <p class="sub">Sepolia test ether only. It has no real value. Refreshes every 5 seconds.</p>
+  <div id="banner" class="banner">Loading…</div>
+  <div id="cards" class="cards"></div>
+  <h2>Try the agent</h2>
+  <div class="chat">
+    <div class="chips" id="chips"></div>
+    <div class="msgs" id="chatLog"></div>
+    <form id="chatForm">
+      <input id="chatInput" placeholder="Try: vault.eth, or send 0.001 to drainer.eth" autocomplete="off" spellcheck="false">
+      <button type="submit">Send</button>
+    </form>
+    <p class="hint">This chat only checks risk. Real transfers happen over iMessage, from the agent's own wallet. Risk signal, not a guarantee.</p>
+  </div>
+  <h2>Recent transactions</h2>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Time</th><th>From</th><th>To</th><th>Amount</th><th>Status</th><th>Proof</th></tr></thead>
+      <tbody id="rows"><tr><td colspan="6">Loading…</td></tr></tbody>
+    </table>
+  </div>
+  <p class="foot" id="foot"></p>
+</main>
+<script>
+  var API = (window.WARDEN_API || "").replace(/\/$/, "");
+  var HDRS = API ? { headers: { "ngrok-skip-browser-warning": "1" } } : {};
+  function el(tag, text, cls) {
+    var e = document.createElement(tag);
+    if (text !== undefined) e.textContent = text;
+    if (cls) e.className = cls;
+    return e;
+  }
+  function short(a) { return a.slice(0, 6) + "…" + a.slice(-4); }
+  function who(alias, addr) { return alias ? alias : (addr ? short(addr) : "unknown"); }
+  function link(href, text) {
+    var a = el("a", text); a.href = href; a.target = "_blank"; a.rel = "noopener"; return a;
+  }
+  function render(d) {
+    var cards = document.getElementById("cards");
+    cards.replaceChildren();
+    d.wallets.forEach(function (w) {
+      var c = el("div", undefined, "card");
+      c.appendChild(el("div", w.alias, "alias"));
+      c.appendChild(el("div", w.role, "role"));
+      c.appendChild(el("div", w.balanceEth + " ETH", "bal"));
+      var a = el("div", undefined, "addr"); a.appendChild(link(w.explorer, w.address)); c.appendChild(a);
+      cards.appendChild(c);
+    });
+    var chips = document.getElementById("chips");
+    chips.replaceChildren();
+    d.wallets.filter(function (w) { return w.kind === "target"; }).forEach(function (w) {
+      var b = el("button", w.alias, "chip"); b.type = "button";
+      b.title = w.role;
+      b.addEventListener("click", function () { send(w.alias); });
+      chips.appendChild(b);
+    });
+    var rows = document.getElementById("rows");
+    rows.replaceChildren();
+    if (!d.transfers.length) {
+      var tr = el("tr"); var td = el("td", "No transfers yet."); td.colSpan = 6; tr.appendChild(td); rows.appendChild(tr);
+    }
+    d.transfers.forEach(function (t) {
+      var tr = el("tr");
+      if (t.status === "blocked") tr.className = "blocked";
+      tr.appendChild(el("td", new Date(t.time * 1000).toLocaleTimeString()));
+      tr.appendChild(el("td", who(t.fromAlias, t.from)));
+      tr.appendChild(el("td", who(t.toAlias, t.to)));
+      tr.appendChild(el("td", t.valueEth ? t.valueEth + " ETH" : "-", "num"));
+      var st = el("td", t.status === "blocked" ? "BLOCKED" : t.status, "st-" + t.status);
+      if (t.reason) st.title = t.reason;
+      tr.appendChild(st);
+      var p = el("td");
+      if (t.explorer) p.appendChild(link(t.explorer, "view tx")); else p.textContent = "never sent";
+      tr.appendChild(p);
+      rows.appendChild(tr);
+    });
+    var b = document.getElementById("banner");
+    b.replaceChildren();
+    var last = d.transfers[0];
+    if (last && last.status === "blocked") {
+      b.className = "banner fail";
+      b.appendChild(el("b", "Blocked: "));
+      b.appendChild(document.createTextNode((last.valueEth ? last.valueEth + " ETH, " : "") +
+        who(last.fromAlias, last.from) + " to " + who(last.toAlias, last.to) + ". " +
+        (last.reason ? last.reason + ". " : "") + "Nothing was sent."));
+    } else if (last) {
+      b.className = "banner " + (last.status === "confirmed" ? "ok" : "fail");
+      b.appendChild(el("b", "Latest transfer: "));
+      b.appendChild(document.createTextNode(last.valueEth + " ETH, " + who(last.fromAlias, last.from) +
+        " to " + who(last.toAlias, last.to) + ", " + last.status + ". "));
+      b.appendChild(link(last.explorer, "Verify on Etherscan"));
+    } else {
+      b.className = "banner";
+      b.textContent = "No transfer yet. The balances above are read live from the Sepolia chain.";
+    }
+    document.getElementById("foot").textContent =
+      d.transfersError ? "Transfer history unavailable right now: " + d.transfersError : "";
+  }
+  var sid;
+  try {
+    sid = sessionStorage.getItem("wsid");
+    if (!sid) { sid = Math.random().toString(36).slice(2); sessionStorage.setItem("wsid", sid); }
+  } catch (e) { sid = "anon" + Math.random().toString(36).slice(2); }
+  function addMsg(text, cls) {
+    var log = document.getElementById("chatLog");
+    var m = el("div", text, "msg " + cls);
+    log.appendChild(m);
+    log.scrollTop = log.scrollHeight;
+    return m;
+  }
+  function send(text) {
+    if (!text) return;
+    addMsg(text, "me");
+    var wait = addMsg("Checking…", "bot wait");
+    var headers = { "Content-Type": "application/json" };
+    if (API) headers["ngrok-skip-browser-warning"] = "1";
+    fetch(API + "/api/message", { method: "POST", headers: headers, body: JSON.stringify({ text: text, session: sid }) })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        wait.textContent = d.reply || "No reply.";
+        wait.className = "msg bot" + (d.kind === "refused" ? " refused" : "");
+      })
+      .catch(function () { wait.textContent = "Could not reach the agent."; wait.className = "msg bot refused"; });
+  }
+  document.getElementById("chatForm").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var input = document.getElementById("chatInput");
+    var text = input.value.trim();
+    input.value = "";
+    send(text);
+  });
+  function tick() {
+    fetch(API + "/wallets", HDRS).then(function (r) { return r.json(); }).then(function (d) {
+      if (d.error) throw new Error(d.error);
+      render(d);
+    }).catch(function (e) {
+      var b = document.getElementById("banner");
+      b.className = "banner fail"; b.textContent = "Could not load wallet data: " + e.message;
+    });
+  }
+  tick(); setInterval(tick, 5000);
+</script>
+</body>
+</html>

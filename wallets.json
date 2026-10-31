@@ -1,0 +1,42 @@
+[
+  {
+    "alias": "andrew.eth",
+    "role": "Main wallet (agent, sender)",
+    "address": "0x01E86b9db57dc079B9167FDB37416dAf11a69202"
+  },
+  {
+    "alias": "akul.eth",
+    "role": "Other wallet (receiver)",
+    "address": "0xE54Ea6a50DD6be272aEF623238E5d1DB66e9563B"
+  },
+  {
+    "alias": "drainer.eth",
+    "role": "Test target: selfdestruct",
+    "address": "0x48F8686E6f0f4eB99a9ea89ee68C2ce93a4fBf32",
+    "kind": "target"
+  },
+  {
+    "alias": "vault.eth",
+    "role": "Test target: verified, reentrancy and more",
+    "address": "0x710a4A46AcA691e8CA1388F1DCa5b4A1Ed28eB2d",
+    "kind": "target"
+  },
+  {
+    "alias": "rugpull.eth",
+    "role": "Test target: owner can mint and blacklist",
+    "address": "0x1c699C8347ee07F786895353632dc9B8E8CF3B0a",
+    "kind": "target"
+  },
+  {
+    "alias": "proxy.eth",
+    "role": "Test target: upgradeable proxy",
+    "address": "0xb9374A62D1bA2A3a0231653D47211200d6d17CA1",
+    "kind": "target"
+  },
+  {
+    "alias": "phisher.eth",
+    "role": "Test target: tx.origin auth",
+    "address": "0xCfe1752F7882C93069E8846A760122B1c0f88E64",
+    "kind": "target"
+  }
+]

@@ -19,6 +19,43 @@ OK_RESULT = auditor.build_result(ADDR, 11155111, [], False)
 
 
 class HandleTests(unittest.TestCase):
+    def setUp(self):
+        server.reset()
+
+    def test_identical_requests_are_cached_for_ttl(self):
+        with mock.patch.object(auditor, "screen", return_value=OK_RESULT) as m:
+            server.handle(f"/screen?address={ADDR}", now=1000)
+            server.handle(f"/screen?address={ADDR}", now=1000 + server.CACHE_TTL - 1)
+            self.assertEqual(m.call_count, 1)
+            server.handle(f"/screen?address={ADDR}", now=1000 + server.CACHE_TTL + 1)
+            self.assertEqual(m.call_count, 2)
+
+    def test_failures_are_not_cached(self):
+        with mock.patch.object(auditor, "screen", side_effect=auditor.AuditorError("down")) as m:
+            self.assertEqual(server.handle(f"/screen?address={ADDR}", now=1000)[0], 502)
+            self.assertEqual(server.handle(f"/screen?address={ADDR}", now=1001)[0], 502)
+            self.assertEqual(m.call_count, 2)
+
+    def test_cache_key_is_exact_address_so_target_echo_matches(self):
+        upper = "0x" + "AB" * 20
+        lower = upper.lower()
+        with mock.patch.object(auditor, "screen",
+                               side_effect=lambda a, c: auditor.build_result(a, c, [], False)):
+            first = server.handle(f"/screen?address={upper}", now=1000)[1]
+            second = server.handle(f"/screen?address={lower}", now=1001)[1]
+        self.assertEqual((first["target"], second["target"]), (upper, lower))
+
+    def test_rate_limit_per_client(self):
+        with mock.patch.object(auditor, "screen", return_value=OK_RESULT):
+            for i in range(server.RATE_LIMIT):
+                self.assertEqual(server.handle(f"/screen?address={ADDR}", client="a", now=1000 + i * 0.1)[0], 200)
+            self.assertEqual(server.handle(f"/screen?address={ADDR}", client="a", now=1010)[0], 429)
+            self.assertEqual(server.handle(f"/screen?address={ADDR}", client="b", now=1010)[0], 200)
+
+    def test_health_is_never_rate_limited(self):
+        for i in range(server.RATE_LIMIT + 5):
+            self.assertEqual(server.handle("/health", client="a", now=1000)[0], 200)
+
     def test_health(self):
         self.assertEqual(server.handle("/health"), (200, {"ok": True}))
 
