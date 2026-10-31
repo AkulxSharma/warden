@@ -240,6 +240,24 @@ class GuardTests(unittest.TestCase):
         self.assertIsNone(self.v("This scan did not flag reentrancy.", followup=True))
         self.assertTrue(self.v("Yes, reentrancy is there.", followup=True).startswith("unflagged"))
 
+    def test_every_known_id_is_caught_when_absent(self):
+        known = {i for _, ids in agent.RISK_TERMS for i in ids}
+        for _, needs in agent.RISK_TERMS:
+            for fid in needs:
+                reason = self.v(f"Found {fid} here.", ids=known - {fid})
+                self.assertTrue(reason and reason.startswith("unflagged"), fid)
+                self.assertIsNone(self.v(f"Found {fid} here.", ids={fid}), fid)
+
+    def test_fixture_ids_are_all_covered_by_the_keyword_map(self):
+        covered = {i for _, ids in agent.RISK_TERMS for i in ids}
+        for name in FIXTURES:
+            for f in load(name)["findings"]:
+                self.assertIn(f["id"], covered, name)
+
+    def test_long_denial_cannot_smuggle_a_claim(self):
+        text = "This scan did not flag that. " + "But it is a rug pull. " * 6
+        self.assertTrue(self.v(text, followup=True).startswith("unflagged"))
+
     def test_length_and_verdict_talk(self):
         self.assertEqual(self.v("x" * 11, limit=10), "too long")
         self.assertEqual(self.v("verdict is high"), "verdict talk")

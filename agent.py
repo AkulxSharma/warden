@@ -32,6 +32,7 @@ MAX_BULLETS = 5
 MAX_FOLLOWUP_FINDINGS = 20
 BULLET_MAX = 160    # chars, generated bullet
 ANSWER_MAX = 600    # chars, generated follow-up answer
+DENIAL_MAX = 120    # chars: a "did not flag X" answer that names an unflagged risk must be short
 MSG_MAX = 300       # chars of an Auditor message sent to the model
 SHOW_MAX = 160      # chars of an Auditor message shown as the fallback bullet
 QUESTION_MAX = 500
@@ -98,7 +99,7 @@ RISK_TERMS = [(re.compile(p, re.I), ids) for p, ids in {
     r"arbitrary|any address": {"arbitrary-send"},
     r"delegatecall": {"delegatecall"},
     r"self.?destruct": {"dangerous-selfdestruct"},
-    r"tx\.origin|phishing": {"tx-origin"},
+    r"tx[.\- ]?origin|phishing": {"tx-origin"},
     r"return value|unchecked": {"unchecked-low-level-call"},
     r"7702|delegation": {"eip7702-delegation"},
     r"honeypot|rug.?pull|backdoor|scam": set(),
@@ -173,7 +174,7 @@ def _violation(text, ids, limit, followup):
         return "verdict talk"
     for pattern, needs in RISK_TERMS:
         if pattern.search(text) and not needs & ids:
-            if not (followup and "did not flag" in text.lower()):
+            if not (followup and len(text) <= DENIAL_MAX and "did not flag" in text.lower()):
                 return "unflagged risk: " + pattern.pattern
     return None
 

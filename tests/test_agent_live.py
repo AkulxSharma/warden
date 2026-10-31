@@ -75,6 +75,7 @@ class LiveTests(unittest.TestCase):
         reply = self.run_timed("what does reentrancy mean? (flagged)", agent.answer,
                                load("agent_high_verified.json"), "what does reentrancy mean?")
         self.assertFalse(reply.startswith(agent.CANT_ANSWER), reply)
+        self.assertNotIn("did not flag", reply.lower())  # reentrancy IS flagged on this fixture
 
     def test_followup_about_unflagged_risk_says_not_flagged(self):
         for question, name in (("what does reentrancy mean?", "agent_low.json"),
