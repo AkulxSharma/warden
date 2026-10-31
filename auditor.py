@@ -102,8 +102,9 @@ def screen(address, chain_id=DEFAULT_CHAIN_ID, calldata=None, value=None, solc="
             except SOURCE_ERRORS:
                 reason = "verified source could not be compiled here"
             else:
-                proxy = [f for f in code_findings if f["id"] == "eip1967-proxy"]
-                return build_result(address, chain_id, found + proxy, True)
+                # admin powers and upgradeability exist whether or not the source is verified
+                kept = [f for f in code_findings if f["id"] in ("eip1967-proxy", "admin-selectors")]
+                return build_result(address, chain_id, found + kept, True)
         extra = [{"id": "source-not-scanned", "severity": "medium",
                   "message": f"{reason}; bytecode checks only"}]
 
