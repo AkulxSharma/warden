@@ -183,12 +183,8 @@ def run(allowed, public, dry_run, poll, self_chat=False, agent_handle=""):
             if style == GROUP_CHAT_STYLE:
                 continue
             chat_key = chat_guid or handle
-            if normalize(handle) not in allowed_norm:
-                if not public:
-                    continue
-                if chat_key not in open_chats and not wants_warden(text):
-                    continue  # a normal text to the owner's number, not for Warden
-            open_chats.add(chat_key)
+            if normalize(handle) not in allowed_norm and not public:
+                continue
             key = (chat_guid or handle, text)
             if time.time() - recent.get(key, 0) < 15:
                 continue  # self-chat can store one text as two rows
