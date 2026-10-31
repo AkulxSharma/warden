@@ -10,6 +10,7 @@ Flow (PRODUCT-DEV-DOC section 2):
 
 Every exchange is appended to data/events.jsonl for the dashboard's live feed.
 """
+import hashlib
 import json
 import os
 import re
@@ -18,6 +19,7 @@ import threading
 import time
 from pathlib import Path
 
+import aliases
 import transfer
 
 from . import services
@@ -65,6 +67,23 @@ def gate(result, address, chain_id=SEPOLIA):
     return transfer.gate(result)
 
 
+def name_of(address):
+    """Alias (andrew.eth) if the address has one, else the short form."""
+    for alias, addr in aliases.ALIASES.items():
+        if addr.lower() == (address or "").lower():
+            return alias
+    return short(address)
+
+
+def _stage(state, stage, **fields):
+    """Progress-tracker event (UI-PROGRESS-SPEC.md). Stage names are a contract."""
+    _log({"ts": time.time(), "convo": state["convo"], "stage": stage, **fields})
+
+
+def _reasons(result):
+    return [f["message"] for f in result.get("findings", [])][:3]
+
+
 def short(address):
     return f"{address[:6]}…{address[-4:]}"
 
@@ -89,19 +108,31 @@ def _transfer(parsed, state, can_transfer):
         return "need_amount", NO_AMOUNT, None
     if parsed.amount <= 0 or parsed.amount > max_send():
         return "blocked_amount", f"Transfers are capped at {max_send():g} Sepolia ETH for this demo.", None
+    target, amount = name_of(parsed.address), f"{parsed.amount:g}"
+    _stage(state, "received", target=target, amountEth=amount)
+    _stage(state, "screening", target=target, amountEth=amount)
     result, _ = _screen(parsed.address, SEPOLIA)
     if result:
         state["result"], state["history"] = result, []
+        _stage(state, "screening", target=target, amountEth=amount, verdict=result["verdict"],
+               riskScore=result["riskScore"], reasons=_reasons(result))
     if gate(result, parsed.address) == "refuse":
         state["pending"] = None
+        _stage(state, "refused", target=target, amountEth=amount,
+               verdict=result and result["verdict"], riskScore=result and result["riskScore"],
+               reasons=_reasons(result) if result else ["The risk check could not run."])
         if result is None:
             return "refused", CHECK_FAILED, None
         return "refused", (f"Refused: not sending {parsed.amount:g} ETH to {short(parsed.address)}.\n\n"
                            + services.agent_reply(result)), result
     reply = services.agent_reply(result)
     if not can_transfer:
+        _stage(state, "screened", target=target, amountEth=amount, verdict=result["verdict"],
+               riskScore=result["riskScore"], reasons=_reasons(result))
         return "screened", reply + NOT_ALLOWED, result
     state["pending"] = {"to": parsed.address, "amount": parsed.amount, "ts": time.time()}
+    _stage(state, "awaiting_confirmation", target=target, amountEth=amount,
+           verdict=result["verdict"], riskScore=result["riskScore"])
     return "confirm", (f"{reply}\n\nReply YES to send {parsed.amount:g} Sepolia ETH to "
                        f"{short(parsed.address)}, or NO to cancel."), result
 
@@ -110,15 +141,20 @@ def _confirm(state):
     pending, state["pending"] = state.get("pending"), None
     if not pending:
         return "yes_nothing", NO_PENDING
+    info = {"target": name_of(pending["to"]), "amountEth": f"{pending['amount']:g}"}
     if time.time() - pending["ts"] > PENDING_TTL:
+        _stage(state, "expired", **info)
         return "expired", EXPIRED
     if not services.transfer_enabled():
+        _stage(state, "paid", txHash=None, demo=True, **info)
         return "demo_sent", DEMO_SENT
     try:
         tx = services.send_transfer(pending["to"], pending["amount"])
     except Exception as exc:  # report the failure, never claim a send
         print(f"[warden] transfer failed: {exc!r}", file=sys.stderr)
+        _stage(state, "failed", reason=type(exc).__name__, **info)
         return "send_failed", SEND_FAILED.format(type(exc).__name__)
+    _stage(state, "paid", txHash=tx, **info)
     return "sent", (f"Sent {pending['amount']:g} Sepolia ETH to {short(pending['to'])}.\n"
                     f"{EXPLORER_TX}{tx}")
 
@@ -126,7 +162,8 @@ def _confirm(state):
 def handle_message(text, session="default", channel="web", sender="you", can_transfer=False):
     """Return {"reply": str, "result": dict | None, "kind": str}."""
     parsed = parse(text)
-    state = _sessions.setdefault(session, {"result": None, "history": [], "pending": None})
+    state = _sessions.setdefault(session, {"result": None, "history": [], "pending": None,
+                                           "convo": hashlib.sha256(session.encode()).hexdigest()[:10]})
     result = None
     kind = parsed.kind
 
@@ -148,6 +185,9 @@ def handle_message(text, session="default", channel="web", sender="you", can_tra
     elif parsed.kind == "yes":
         kind, reply = _confirm(state) if can_transfer else ("yes_nothing", NO_PENDING)
     elif parsed.kind == "no":
+        if state.get("pending"):
+            _stage(state, "cancelled", target=name_of(state["pending"]["to"]),
+                   amountEth=f"{state['pending']['amount']:g}")
         kind, reply = "cancelled", CANCELLED if state.get("pending") else NO_PENDING
         state["pending"] = None
     elif parsed.kind == "text" and state["result"]:

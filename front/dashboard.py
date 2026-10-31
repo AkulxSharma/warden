@@ -5,7 +5,8 @@
 GET  /                     the page
 GET  /api/status           Auditor / Agent / transfer mode, agent handle
 POST /api/message {text, session}   same path as an iMessage
-GET  /api/events?after=N   exchanges from every channel (live iMessage feed)
+GET  /api/events?after=N   exchanges and progress stages (live tracker)
+GET  /wallets              balances, passed through from the Auditor server
 """
 import argparse
 import json
@@ -13,6 +14,7 @@ import os
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+import urllib.request
 from urllib.parse import parse_qs, urlparse
 
 from . import services
@@ -40,6 +42,14 @@ class Handler(BaseHTTPRequestHandler):
         elif url.path == "/api/status":
             self._send(200, {"mode": services.status(),
                              "handle": os.environ.get("WARDEN_AGENT_HANDLE", "")})
+        elif url.path == "/wallets":
+            # balances live on the Auditor server (server.py); pass them through so the page works same-origin
+            base = (os.environ.get("WARDEN_AUDITOR_URL") or "http://127.0.0.1:8000").rstrip("/")
+            try:
+                with urllib.request.urlopen(base + "/wallets", timeout=15) as r:
+                    self._send(r.status, r.read())
+            except Exception:
+                self._send(502, {"error": "auditor server unreachable"})
         elif url.path == "/api/events":
             after = int(parse_qs(url.query).get("after", ["0"])[0])
             self._send(200, {"events": read_events(after)})

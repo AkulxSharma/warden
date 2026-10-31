@@ -6,124 +6,185 @@
 <title>Warden</title>
 <style>
   :root {
-    --bg: #f5f6f8; --panel: #ffffff; --ink: #14171c; --muted: #646b76; --line: #e2e5ea;
-    --accent: #2f6fed; --low: #1f8a4c; --med: #b7791f; --high: #c53030;
-    --low-bg: #e7f5ec; --med-bg: #fbf1e0; --high-bg: #fbe6e6;
-    --bubble-in: #e9e9eb; --bubble-in-ink: #14171c; --bubble-out: #0a84ff;
+    --bg: #f4f5f7; --panel: #ffffff; --panel-2: #f8f9fb; --ink: #12151a; --muted: #69707c; --line: #e3e6eb;
+    --accent: #3b6cf6; --accent-soft: #e8eefe;
+    --ok: #17834a; --ok-soft: #e4f4ea; --warn: #b26a00; --warn-soft: #fbf0dc; --bad: #c62f2f; --bad-soft: #fbe5e5;
+    --bubble-in: #e9e9eb; --bubble-in-ink: #12151a; --bubble-out: #0a84ff;
+    --shadow: 0 1px 2px rgba(16,24,40,.04), 0 4px 16px rgba(16,24,40,.06);
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #0e1013; --panel: #171a1f; --ink: #e8eaee; --muted: #9aa1ab; --line: #2a2f37;
-      --accent: #6b9bff; --low: #4cc27e; --med: #e0a84a; --high: #f07070;
-      --low-bg: #15291e; --med-bg: #2d2414; --high-bg: #321818;
-      --bubble-in: #26282d; --bubble-in-ink: #e8eaee;
+      --bg: #0b0d10; --panel: #14171c; --panel-2: #191d23; --ink: #e9ecf1; --muted: #98a0ad; --line: #262b33;
+      --accent: #7096ff; --accent-soft: #1b2440;
+      --ok: #4fc684; --ok-soft: #13271b; --warn: #e8a947; --warn-soft: #2c2212; --bad: #f37373; --bad-soft: #321818;
+      --bubble-in: #262931; --bubble-in-ink: #e9ecf1; --shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 20px rgba(0,0,0,.25);
     }
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--ink);
-         font: 15px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif; }
-  header { display: flex; align-items: center; gap: 12px; padding: 18px 24px; border-bottom: 1px solid var(--line); }
-  header h1 { font-size: 20px; margin: 0; letter-spacing: -0.01em; }
-  header .tag { color: var(--muted); font-size: 14px; }
-  .badge { font-size: 12px; padding: 3px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
-  .badge.mock { border-color: var(--med); color: var(--med); }
-  .badge.net { margin-left: auto; }
-  main { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 20px; padding: 20px 24px; max-width: 1200px; margin: 0 auto; }
-  @media (max-width: 900px) { main { grid-template-columns: 1fr; padding: 16px; } }
-  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
-  .panel h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0 0 12px; }
-  form { display: flex; gap: 8px; }
-  input { flex: 1; min-width: 0; font: inherit; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line);
-          background: var(--bg); color: var(--ink); }
-  input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
-  button { font: inherit; font-weight: 600; padding: 10px 16px; border-radius: 10px; border: 0; background: var(--accent); color: #fff; cursor: pointer; }
-  .demos { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; font-size: 13px; color: var(--muted); align-items: center; }
-  .demos button { background: transparent; color: var(--accent); border: 1px solid var(--line); padding: 4px 10px; font-weight: 500; font-size: 13px; }
-  .left { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
-  .result.empty { color: var(--muted); }
-  .verdict-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
-  .verdict { font-weight: 700; font-size: 22px; padding: 6px 14px; border-radius: 10px; }
-  .verdict.LOW { color: var(--low); background: var(--low-bg); }
-  .verdict.MEDIUM { color: var(--med); background: var(--med-bg); }
-  .verdict.HIGH { color: var(--high); background: var(--high-bg); }
-  .score { flex: 1; min-width: 160px; }
-  .score .num { font-variant-numeric: tabular-nums; font-weight: 600; }
-  .bar { height: 8px; border-radius: 99px; background: var(--line); margin-top: 6px; overflow: hidden; }
-  .bar span { display: block; height: 100%; border-radius: 99px; transition: width .4s; }
-  .meta { display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0 6px; font-size: 13px; }
-  .meta .chip { padding: 3px 9px; border-radius: 999px; background: var(--bg); border: 1px solid var(--line); }
-  .meta .unverified { color: var(--med); border-color: var(--med); }
-  .meta .verified { color: var(--low); border-color: var(--low); }
-  code { font: 13px ui-monospace, "SF Mono", Menlo, monospace; word-break: break-all; }
-  ul.findings { list-style: none; padding: 0; margin: 12px 0; display: flex; flex-direction: column; gap: 8px; }
-  ul.findings li { padding: 10px 12px; border-radius: 10px; background: var(--bg); border-left: 3px solid var(--line); }
-  ul.findings li.high { border-left-color: var(--high); }
-  ul.findings li.medium { border-left-color: var(--med); }
-  ul.findings li.low { border-left-color: var(--low); }
-  ul.findings .fid { font-size: 12px; color: var(--muted); }
-  .disclaimer { font-size: 13px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 10px; margin-top: 12px; }
-  .source { font-size: 12px; color: var(--muted); margin-top: 8px; }
-  .phone { border-radius: 28px; border: 1px solid var(--line); background: var(--panel); display: flex; flex-direction: column; height: 640px; overflow: hidden; }
-  .phone .top { text-align: center; padding: 14px 10px 10px; border-bottom: 1px solid var(--line); }
-  .phone .avatar { width: 40px; height: 40px; border-radius: 50%; margin: 0 auto 4px; background: var(--accent); color: #fff;
-                   display: grid; place-items: center; font-size: 20px; }
+         font: 15px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI", sans-serif;
+         -webkit-font-smoothing: antialiased; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code, .mono { font: 13px ui-monospace, "SF Mono", Menlo, monospace; }
+
+  header { max-width: 1240px; margin: 0 auto; padding: 22px 24px 8px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .logo { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; font-size: 20px;
+          background: linear-gradient(135deg, var(--accent), #8a5cf6); color: #fff; box-shadow: var(--shadow); }
+  .brand h1 { margin: 0; font-size: 20px; letter-spacing: -.02em; }
+  .brand p { margin: 0; color: var(--muted); font-size: 13px; }
+  .chips { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+  .chip { font-size: 12px; padding: 4px 10px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); color: var(--muted); }
+  .live { display: inline-flex; align-items: center; gap: 6px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 0 var(--ok); animation: pulse 2s infinite; }
+  .live.off .dot { background: var(--warn); animation: none; }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 60%, transparent); } 70% { box-shadow: 0 0 0 7px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+
+  main { max-width: 1240px; margin: 0 auto; padding: 12px 24px 40px; display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 20px; }
+  .col { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 20px; box-shadow: var(--shadow); }
+  .card h2 { margin: 0 0 14px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--muted);
+             display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+
+  /* tracker */
+  .tracker { padding: 24px; }
+  .steps { display: grid; grid-template-columns: repeat(5, 1fr); position: relative; margin: 6px 0 22px; }
+  .steps::before { content: ""; position: absolute; top: 15px; left: 10%; right: 10%; height: 3px; background: var(--line); border-radius: 3px; }
+  .rail { position: absolute; top: 15px; left: 10%; height: 3px; background: var(--accent); border-radius: 3px; width: 0; transition: width .5s ease; }
+  .step { position: relative; text-align: center; font-size: 12.5px; color: var(--muted); padding: 0 4px; }
+  .step .n { width: 33px; height: 33px; margin: 0 auto 8px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 13px;
+             background: var(--panel); border: 2px solid var(--line); color: var(--muted); position: relative; transition: all .3s; }
+  .step.done .n { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .step.active .n { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 0 5px var(--accent-soft); }
+  .step.active { color: var(--ink); font-weight: 600; }
+  .step.bad .n { background: var(--bad); border-color: var(--bad); color: #fff; box-shadow: 0 0 0 5px var(--bad-soft); }
+  .step.bad { color: var(--bad); font-weight: 600; }
+  .step.good .n { background: var(--ok); border-color: var(--ok); color: #fff; box-shadow: 0 0 0 5px var(--ok-soft); }
+  .tracker.refused .rail { background: var(--bad); }
+  .tracker.paid .rail { background: var(--ok); }
+
+  .status { display: flex; gap: 16px; align-items: flex-start; padding: 16px; border-radius: 12px; background: var(--panel-2); border: 1px solid var(--line); }
+  .status .icon { font-size: 26px; line-height: 1; }
+  .status h3 { margin: 0 0 2px; font-size: 18px; letter-spacing: -.01em; }
+  .status .sub { color: var(--muted); font-size: 14px; }
+  .tracker.refused .status { background: var(--bad-soft); border-color: color-mix(in srgb, var(--bad) 30%, transparent); }
+  .tracker.paid .status { background: var(--ok-soft); border-color: color-mix(in srgb, var(--ok) 30%, transparent); }
+  .tracker.waiting .status { background: var(--warn-soft); border-color: color-mix(in srgb, var(--warn) 30%, transparent); }
+  .reasons { margin: 10px 0 0; padding-left: 18px; font-size: 14px; }
+  .reasons li { margin: 3px 0; }
+  .verdict { display: inline-block; font-weight: 700; font-size: 12px; padding: 2px 8px; border-radius: 6px; margin-left: 6px; vertical-align: 2px; }
+  .verdict.LOW { color: var(--ok); background: var(--ok-soft); }
+  .verdict.MEDIUM { color: var(--warn); background: var(--warn-soft); }
+  .verdict.HIGH { color: var(--bad); background: var(--bad-soft); }
+  .countdown { height: 3px; background: var(--line); border-radius: 3px; margin-top: 14px; overflow: hidden; }
+  .countdown span { display: block; height: 100%; width: 100%; background: var(--muted); transform-origin: left; }
+
+  /* wallets */
+  .wallets { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .wallet { padding: 16px; border-radius: 12px; background: var(--panel-2); border: 1px solid var(--line); min-width: 0; }
+  .wallet .alias { font-weight: 700; font-size: 16px; }
+  .wallet .role { color: var(--muted); font-size: 12.5px; }
+  .wallet .bal { font-size: 26px; font-weight: 700; letter-spacing: -.02em; margin: 10px 0 2px; font-variant-numeric: tabular-nums; transition: color .4s; }
+  .wallet .bal small { font-size: 13px; color: var(--muted); font-weight: 500; }
+  .wallet .bal.changed { color: var(--accent); }
+  .targets { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .target { font-size: 12.5px; padding: 6px 10px; border-radius: 10px; border: 1px dashed color-mix(in srgb, var(--bad) 45%, var(--line)); color: var(--muted); }
+  .target b { color: var(--bad); font-weight: 600; }
+  .txs { list-style: none; margin: 14px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  .tx { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; padding: 8px 10px; border-radius: 10px; background: var(--panel-2); }
+  .tx .st { font-weight: 600; }
+  .tx .st.blocked { color: var(--bad); } .tx .st.confirmed { color: var(--ok); } .tx .st.failed { color: var(--warn); }
+  .muted { color: var(--muted); font-size: 13px; }
+
+  /* feed */
+  .feed { display: flex; flex-direction: column; gap: 8px; max-height: 300px; overflow-y: auto; }
+  .ev { padding: 10px 12px; border-radius: 10px; background: var(--panel-2); font-size: 13px; }
+  .ev.fresh { animation: flash 1.6s ease-out; }
+  @keyframes flash { from { box-shadow: 0 0 0 2px var(--accent); } to { box-shadow: 0 0 0 0 transparent; } }
+  .ev .top { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; margin-bottom: 2px; }
+
+  /* phone */
+  .phone { border-radius: 30px; border: 1px solid var(--line); background: var(--panel); display: flex; flex-direction: column; height: 600px; overflow: hidden; box-shadow: var(--shadow); }
+  .phone .top { text-align: center; padding: 14px 10px 10px; border-bottom: 1px solid var(--line); background: var(--panel-2); }
+  .phone .avatar { width: 42px; height: 42px; border-radius: 50%; margin: 0 auto 4px; display: grid; place-items: center; font-size: 20px;
+                   background: linear-gradient(135deg, var(--accent), #8a5cf6); color: #fff; }
   .phone .name { font-size: 13px; font-weight: 600; }
   .phone .sub { font-size: 11px; color: var(--muted); }
   .thread { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 6px; }
-  .bubble { max-width: 82%; padding: 8px 12px; border-radius: 18px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; }
+  .bubble { max-width: 84%; padding: 8px 12px; border-radius: 18px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; line-height: 1.4; }
   .bubble.in { align-self: flex-start; background: var(--bubble-in); color: var(--bubble-in-ink); border-bottom-left-radius: 6px; }
   .bubble.out { align-self: flex-end; background: var(--bubble-out); color: #fff; border-bottom-right-radius: 6px; }
   .typing { align-self: flex-start; color: var(--muted); font-size: 13px; padding: 4px 8px; }
-  .phone form { padding: 10px; border-top: 1px solid var(--line); }
-  .phone input { border-radius: 999px; }
-  .phone button { border-radius: 999px; padding: 8px 14px; }
-  .feed { display: flex; flex-direction: column; gap: 8px; max-height: 360px; overflow-y: auto; }
-  .feed .item { padding: 10px 12px; border-radius: 10px; background: var(--bg); font-size: 13px; }
-  .feed .item.fresh { animation: flash 1.6s ease-out; }
-  @keyframes flash { from { box-shadow: 0 0 0 2px var(--accent); } to { box-shadow: 0 0 0 0 transparent; } }
-  .feed .who { color: var(--muted); font-size: 12px; display: flex; justify-content: space-between; gap: 8px; }
-  .feed .empty { color: var(--muted); font-size: 13px; }
-  .gate { display: inline-block; font-weight: 700; font-size: 13px; padding: 4px 10px; border-radius: 8px; margin-bottom: 12px; }
-  .gate.high { color: var(--high); background: var(--high-bg); }
-  .gate.medium { color: var(--med); background: var(--med-bg); }
-  .gate.low { color: var(--muted); background: var(--bg); }
-  .pill { font-weight: 700; font-size: 11px; padding: 1px 6px; border-radius: 6px; }
+  .suggest { display: flex; gap: 6px; overflow-x: auto; padding: 8px 10px 0; }
+  .suggest button { flex: none; font: inherit; font-size: 12px; padding: 5px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel-2); color: var(--accent); cursor: pointer; }
+  .phone form { display: flex; gap: 8px; padding: 10px; }
+  .phone input { flex: 1; min-width: 0; font: inherit; padding: 9px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel-2); color: var(--ink); }
+  .phone input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .phone form button { width: 38px; height: 38px; border-radius: 50%; border: 0; background: var(--bubble-out); color: #fff; font-size: 17px; cursor: pointer; }
+  .note { font-size: 12px; color: var(--muted); text-align: center; padding: 0 10px 10px; }
+  footer { max-width: 1240px; margin: 0 auto; padding: 0 24px 30px; color: var(--muted); font-size: 12.5px; }
+
+  @media (max-width: 960px) { main { grid-template-columns: 1fr; padding: 12px 16px 32px; } header { padding: 18px 16px 6px; } .chips { margin-left: 0; } }
+  @media (max-width: 560px) {
+    .wallets { grid-template-columns: 1fr; }
+    .step { font-size: 10.5px; } .step .n { width: 28px; height: 28px; font-size: 12px; }
+    .steps::before, .rail { top: 13px; }
+    .tracker { padding: 18px; }
+  }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 </style>
 </head>
 <body>
 <header>
-  <h1>🛡 Warden</h1>
-  <span class="tag">A firewall for crypto payments, over iMessage.</span>
-  <span class="badge net" id="handleBadge" hidden></span>
-  <span class="badge">Sepolia testnet</span>
-  <span class="badge" id="modeBadge" hidden></span>
+  <div class="logo">🛡</div>
+  <div class="brand">
+    <h1>Warden</h1>
+    <p>A firewall for crypto payments, over iMessage</p>
+  </div>
+  <div class="chips">
+    <span class="chip live" id="live"><span class="dot"></span><span id="liveText">Live</span></span>
+    <span class="chip">Sepolia test ETH · no real value</span>
+  </div>
 </header>
 
 <main>
-  <div class="left">
-    <section class="panel">
-      <h2>Screen an address</h2>
-      <form id="scanForm">
-        <input id="scanInput" placeholder="0x… address or explorer link" autocomplete="off" spellcheck="false">
-        <button>Screen</button>
-      </form>
-      <div class="demos">Try:
-        <button data-addr="0x1111111111111111111111111111111111111111">LOW</button>
-        <button data-addr="0x2222222222222222222222222222222222222222">MEDIUM</button>
-        <button data-addr="0x3333333333333333333333333333333333333333">HIGH (7702)</button>
-        <button data-addr="send 0.01 to 0x3333333333333333333333333333333333333333">send 0.01 → HIGH</button>
+  <div class="col">
+    <section class="card tracker" id="tracker" aria-live="polite">
+      <h2><span>Live request</span><span class="muted" id="trackerWho"></span></h2>
+      <div class="steps" id="steps">
+        <div class="rail" id="rail"></div>
+        <div class="step"><div class="n">1</div>Text received</div>
+        <div class="step"><div class="n">2</div>Checking for vulnerabilities</div>
+        <div class="step"><div class="n">3</div>Awaiting YES</div>
+        <div class="step"><div class="n">4</div>Payment done</div>
+        <div class="step"><div class="n">5</div>Balances updated</div>
+      </div>
+      <div class="status">
+        <div class="icon" id="stIcon">💬</div>
+        <div style="min-width:0;flex:1">
+          <h3 id="stTitle">Ready</h3>
+          <div class="sub" id="stSub">Text the agent “send 0.001 to akul.eth” to start.</div>
+          <ul class="reasons" id="stReasons" hidden></ul>
+          <div class="sub" id="stLink" hidden></div>
+          <div class="countdown" id="countdown" hidden><span id="countdownBar"></span></div>
+        </div>
       </div>
     </section>
 
-    <section class="panel result empty" id="result">Screen an address, or text the Warden handle. The result shows up here.</section>
+    <section class="card">
+      <h2><span>Wallets</span><span class="muted" id="walletsNote"></span></h2>
+      <div class="wallets" id="wallets"><div class="muted">Loading balances…</div></div>
+      <div class="targets" id="targets"></div>
+      <ul class="txs" id="txs"></ul>
+    </section>
 
-    <section class="panel">
-      <h2>Live iMessage feed</h2>
-      <div class="feed" id="feed"><div class="empty">Waiting for texts to the Warden handle…</div></div>
+    <section class="card">
+      <h2><span>iMessage activity</span></h2>
+      <div class="feed" id="feed"><div class="muted" id="feedEmpty">Waiting for texts to the Warden handle…</div></div>
     </section>
   </div>
 
-  <aside>
+  <aside class="col">
     <div class="phone">
       <div class="top">
         <div class="avatar">🛡</div>
@@ -131,133 +192,249 @@
         <div class="sub">iMessage · try it here</div>
       </div>
       <div class="thread" id="thread">
-        <div class="bubble in">Text "send 0.01 to 0x…" and I'll screen the address before anything moves. HIGH risk gets refused. Or text just an address to screen it.</div>
+        <div class="bubble in">Text “send 0.001 to akul.eth” and I'll check the address before anything moves. HIGH risk gets refused. Or send just an address to screen it.</div>
+      </div>
+      <div class="suggest" id="suggest">
+        <button>send 0.001 to drainer.eth</button>
+        <button>send 0.001 to akul.eth</button>
+        <button>0x2222222222222222222222222222222222222222</button>
+        <button>what does delegatecall mean?</button>
       </div>
       <form id="chatForm">
-        <input id="chatInput" placeholder="iMessage" autocomplete="off" spellcheck="false">
-        <button>↑</button>
+        <input id="chatInput" placeholder="iMessage" autocomplete="off" spellcheck="false" aria-label="Message">
+        <button aria-label="Send">↑</button>
       </form>
+      <div class="note">The web chat screens only. Money moves only from the team's test phones.</div>
     </div>
   </aside>
 </main>
+<footer>Risk signal, not a guarantee. Not a full audit. Warden never says an address is safe.</footer>
 
 <script>
+var API = (window.WARDEN_API || "").replace(/\/$/, "");
+const HEADERS = API ? {"ngrok-skip-browser-warning": "1"} : {};
 const $ = (id) => document.getElementById(id);
-const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const session = Math.random().toString(36).slice(2);
-const chainNames = {11155111: "Sepolia", 1: "Ethereum mainnet"};
-const colors = {LOW: "var(--low)", MEDIUM: "var(--med)", HIGH: "var(--high)"};
-const sevRank = {high: 0, medium: 1, low: 2};
+const RESET_MS = 20000;
 
-async function send(text) {
-  const res = await fetch("/api/message", {
-    method: "POST", headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({text, session}),
+function el(tag, cls, text) {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text != null) n.textContent = text;
+  return n;
+}
+function short(a) { return a && a.length > 12 ? a.slice(0, 6) + "…" + a.slice(-4) : (a || ""); }
+function api(path, opts = {}) {
+  return fetch(API + path, {...opts, headers: {...HEADERS, ...(opts.headers || {})}});
+}
+
+/* ---------- tracker ---------- */
+const STEP_OF = {received: 1, screening: 2, awaiting_confirmation: 3, paid: 4, refused: 2, screened: 2, cancelled: 3, expired: 3, failed: 4};
+let resetTimer = null, current = null;
+
+function setStatus(icon, title, sub, reasons, link) {
+  $("stIcon").textContent = icon;
+  $("stTitle").textContent = title;
+  $("stSub").textContent = sub || "";
+  const ul = $("stReasons");
+  ul.replaceChildren(...(reasons || []).map((r) => el("li", "", r)));
+  ul.hidden = !(reasons && reasons.length);
+  const l = $("stLink");
+  l.replaceChildren();
+  if (link) { const a = el("a", "", link.text); a.href = link.href; a.target = "_blank"; a.rel = "noopener"; l.append(a); }
+  l.hidden = !link;
+}
+
+function setSteps(n, mode) {
+  const steps = [...document.querySelectorAll(".step")];
+  steps.forEach((s, i) => {
+    s.className = "step" + (i + 1 < n ? " done" : i + 1 === n ? (mode === "bad" ? " bad" : mode === "good" ? " good" : " active") : "");
   });
-  return res.json();
+  $("rail").style.width = n <= 1 ? "0" : `${(n - 1) / 4 * 80}%`;
 }
 
-function gateLine(kind) {
-  return {refused: ["⛔ Transfer refused", "high"], confirm: ["⏳ Waiting for YES", "medium"],
-          screened: ["Screened only", "low"]}[kind];
+function scheduleReset(after) {
+  clearTimeout(resetTimer);
+  const bar = $("countdownBar"), box = $("countdown");
+  box.hidden = false;
+  bar.style.transition = "none"; bar.style.transform = "scaleX(1)";
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    bar.style.transition = `transform ${RESET_MS}ms linear`; bar.style.transform = "scaleX(0)";
+  }));
+  resetTimer = setTimeout(() => { after && after(); idle(); }, RESET_MS);
 }
 
-function renderResult(result, reply, source, kind) {
-  const el = $("result");
-  el.classList.remove("empty");
-  const findings = [...result.findings].sort((a, b) => (sevRank[a.severity.toLowerCase()] ?? 3) - (sevRank[b.severity.toLowerCase()] ?? 3));
-  const disclaimer = (reply.match(/Risk signal, not a guarantee[^\n]*/) || ["Risk signal, not a guarantee. Not a full audit."])[0];
-  el.innerHTML = `
-    <h2>Result</h2>
-    ${gateLine(kind) ? `<div class="gate ${gateLine(kind)[1]}">${gateLine(kind)[0]}</div>` : ""}
-    <div class="verdict-row">
-      <span class="verdict ${esc(result.verdict)}">${esc(result.verdict)}</span>
-      <div class="score">riskScore <span class="num">${Number(result.riskScore)}</span>/100
-        <div class="bar"><span style="width:${Number(result.riskScore)}%;background:${colors[result.verdict] || "var(--accent)"}"></span></div>
-      </div>
-    </div>
-    <div class="meta">
-      <span class="chip ${result.verified ? "verified" : "unverified"}">${result.verified ? "✓ verified source" : "⚠ unverified: bytecode checks only"}</span>
-      <span class="chip">${esc(chainNames[result.chainId] || "chain " + result.chainId)}</span>
-      <span class="chip"><code>${esc(result.target)}</code></span>
-    </div>
-    ${findings.length
-      ? `<ul class="findings">${findings.map((f) => `<li class="${esc(f.severity.toLowerCase())}">
-           <div class="fid">${esc(f.severity.toUpperCase())} · ${esc(f.id)}</div>${esc(f.message)}</li>`).join("")}</ul>`
-      : `<p>The scan flagged no issues. That does not rule out risks it does not check for.</p>`}
-    <div class="disclaimer">${esc(disclaimer)}</div>
-    <div class="source">${esc(source)}</div>`;
+function idle() {
+  clearTimeout(resetTimer);
+  current = null;
+  $("tracker").className = "card tracker";
+  $("countdown").hidden = true;
+  $("trackerWho").textContent = "";
+  setSteps(0);
+  setStatus("💬", "Ready", "Text the agent “send 0.001 to akul.eth” to start.");
 }
 
+function verdictText(ev) { return ev.verdict ? `${ev.verdict} risk · ${ev.riskScore}/100` : ""; }
+
+function showStage(ev) {
+  current = ev.convo;
+  const t = $("tracker");
+  const what = `${ev.amountEth || "?"} ETH → ${ev.target || "?"}`;
+  $("trackerWho").textContent = what;
+  $("countdown").hidden = true;
+  clearTimeout(resetTimer);
+  t.className = "card tracker";
+  switch (ev.stage) {
+    case "received":
+      setSteps(1); setStatus("📩", "Text received", `Request to send ${what}.`); break;
+    case "screening":
+      setSteps(2);
+      if (ev.verdict) setStatus("🔍", "Check finished", verdictText(ev), ev.reasons);
+      else setStatus("🔍", "Checking for vulnerabilities…", `Screening ${ev.target} before any money moves.`);
+      break;
+    case "awaiting_confirmation":
+      t.classList.add("waiting"); setSteps(3);
+      setStatus("⏳", "Waiting for YES", `${verdictText(ev)}. The sender has 5 minutes to reply YES.`); break;
+    case "paid":
+      t.classList.add("paid"); setSteps(4, "good");
+      if (ev.txHash) setStatus("✅", "Payment sent", `${what} on Sepolia.`, null,
+        {text: "View transaction on Etherscan ↗", href: "https://sepolia.etherscan.io/tx/" + ev.txHash});
+      else setStatus("✅", "Confirmed (demo mode)", `The check passed and the sender said YES. No wallet is connected, so nothing was sent.`);
+      scheduleReset(() => { setSteps(5, "good"); loadWallets(true); });
+      break;
+    case "refused":
+      t.classList.add("refused"); setSteps(2, "bad");
+      setStatus("⛔", "Refused, nothing was sent", verdictText(ev) || "The risk check could not run.", ev.reasons);
+      scheduleReset(); break;
+    case "screened":
+      setSteps(2, "good");
+      setStatus("🔍", "Screened only", `${verdictText(ev)}. This sender can't move money, so it was a check only.`, ev.reasons);
+      scheduleReset(); break;
+    case "cancelled":
+      setSteps(3, "bad"); setStatus("✋", "Cancelled", "The sender replied NO. Nothing was sent."); scheduleReset(); break;
+    case "expired":
+      setSteps(3, "bad"); setStatus("⌛", "Expired", "No YES within 5 minutes. Nothing was sent."); scheduleReset(); break;
+    case "failed":
+      t.classList.add("refused"); setSteps(4, "bad");
+      setStatus("⚠️", "Transfer failed", "Nothing was sent. " + (ev.reason || "")); scheduleReset(); break;
+  }
+}
+
+/* ---------- feed ---------- */
+const KIND = {refused: "⛔ refused", confirm: "⏳ asked for YES", sent: "✅ sent", demo_sent: "✅ confirmed (demo)",
+  screened: "🔍 screened", scan: "🔍 screened", followup: "💬 follow-up", cancelled: "✋ cancelled", expired: "⌛ expired"};
+function addFeed(ev, fresh) {
+  $("feedEmpty")?.remove();
+  const item = el("div", "ev" + (fresh ? " fresh" : ""));
+  const top = el("div", "top");
+  top.append(el("span", "", `📱 ${ev.sender} · ${new Date(ev.ts * 1000).toLocaleTimeString([], {hour: "numeric", minute: "2-digit"})}`));
+  const right = el("span", "", KIND[ev.kind] || "");
+  if (ev.result?.verdict) right.append(el("span", "verdict " + ev.result.verdict, ev.result.verdict));
+  top.append(right);
+  item.append(top, el("div", "", ev.text));
+  $("feed").prepend(item);
+  while ($("feed").children.length > 30) $("feed").lastChild.remove();
+}
+
+/* ---------- polling ---------- */
+let after = 0, booted = false, timer = null;
+async function poll() {
+  try {
+    const r = await api("/api/events?after=" + after);
+    if (!r.ok) throw new Error(r.status);
+    const {events} = await r.json();
+    for (const ev of events) {
+      after = ev.i + 1;
+      if (!booted) { if (!ev.stage && ev.channel === "imessage") addFeed(ev, false); continue; }
+      if (ev.stage) showStage(ev);
+      else if (ev.channel === "imessage") addFeed(ev, true);
+    }
+    booted = true;
+    $("live").classList.remove("off"); $("liveText").textContent = "Live";
+  } catch (e) {
+    $("live").classList.add("off"); $("liveText").textContent = "Reconnecting…";
+  }
+  timer = setTimeout(poll, 1000);
+}
+document.addEventListener("visibilitychange", () => {
+  clearTimeout(timer);
+  if (!document.hidden) poll();
+});
+
+/* ---------- wallets ---------- */
+const lastBal = {};
+async function loadWallets(highlight) {
+  try {
+    const r = await api("/wallets");
+    if (!r.ok) throw new Error(r.status);
+    const data = await r.json();
+    const main = data.wallets.filter((w) => w.kind !== "target");
+    const targets = data.wallets.filter((w) => w.kind === "target");
+    $("wallets").replaceChildren(...main.map((w) => {
+      const card = el("div", "wallet");
+      const bal = el("div", "bal");
+      bal.append(document.createTextNode(Number(w.balanceEth).toFixed(4) + " "), el("small", "", "SepoliaETH"));
+      if (highlight && lastBal[w.alias] !== undefined && lastBal[w.alias] !== w.balanceEth) {
+        bal.classList.add("changed"); setTimeout(() => bal.classList.remove("changed"), 4000);
+      }
+      lastBal[w.alias] = w.balanceEth;
+      const link = el("a", "mono", short(w.address)); link.href = w.explorer; link.target = "_blank"; link.rel = "noopener";
+      card.append(el("div", "alias", w.alias), el("div", "role", w.role), bal, link);
+      return card;
+    }));
+    $("targets").replaceChildren(...targets.map((w) => {
+      const t = el("a", "target"); t.href = w.explorer; t.target = "_blank"; t.rel = "noopener";
+      t.append(el("b", "", w.alias), document.createTextNode(" · " + (w.role || "test target")));
+      return t;
+    }));
+    $("txs").replaceChildren(...(data.transfers || []).slice(0, 5).map((tx) => {
+      const li = el("li", "tx");
+      li.append(el("span", "", `${tx.fromAlias || short(tx.from)} → ${tx.toAlias || short(tx.to)} · ${tx.valueEth ?? "?"} ETH`));
+      const st = el(tx.explorer ? "a" : "span", "st " + tx.status, tx.status);
+      if (tx.explorer) { st.href = tx.explorer; st.target = "_blank"; st.rel = "noopener"; }
+      li.append(st);
+      return li;
+    }));
+    $("walletsNote").textContent = "updated " + new Date().toLocaleTimeString([], {hour: "numeric", minute: "2-digit"});
+  } catch (e) {
+    if (!$("wallets").querySelector(".wallet"))
+      $("wallets").replaceChildren(el("div", "muted", "Balances unavailable right now (the Auditor server is unreachable)."));
+    $("walletsNote").textContent = "";
+  }
+}
+
+/* ---------- chat ---------- */
 function bubble(text, dir) {
-  const b = document.createElement("div");
-  b.className = "bubble " + dir;
-  b.textContent = text;
-  $("thread").appendChild(b);
+  const b = el("div", "bubble " + dir, text);
+  $("thread").append(b);
   $("thread").scrollTop = $("thread").scrollHeight;
 }
-
 async function chat(text) {
   bubble(text, "out");
-  const typing = document.createElement("div");
-  typing.className = "typing"; typing.textContent = "Warden is scanning…";
-  $("thread").appendChild(typing);
-  const out = await send(text);
+  const typing = el("div", "typing", "Warden is checking…");
+  $("thread").append(typing);
+  $("thread").scrollTop = $("thread").scrollHeight;
+  try {
+    const r = await api("/api/message", {method: "POST", headers: {"Content-Type": "application/json"},
+                                         body: JSON.stringify({text, session})});
+    const out = await r.json();
+    bubble(out.reply || "Something went wrong. Try again.", "in");
+  } catch (e) {
+    bubble("Warden is unreachable right now. Try again in a moment.", "in");
+  }
   typing.remove();
-  bubble(out.reply, "in");
-  if (out.result) renderResult(out.result, out.reply, "from the in-page chat (web never sends money)", out.kind);
 }
-
 $("chatForm").addEventListener("submit", (e) => {
   e.preventDefault();
   const text = $("chatInput").value.trim();
   if (text) { $("chatInput").value = ""; chat(text); }
 });
-$("scanForm").addEventListener("submit", (e) => {
-  e.preventDefault();
-  const text = $("scanInput").value.trim();
-  if (text) chat(text);
-});
-document.querySelectorAll(".demos button").forEach((b) =>
-  b.addEventListener("click", () => { $("scanInput").value = b.dataset.addr; chat(b.dataset.addr); }));
+$("suggest").addEventListener("click", (e) => { if (e.target.tagName === "BUTTON") chat(e.target.textContent); });
 
-const kindLabel = {refused: "⛔ refused", confirm: "⏳ asked for YES", sent: "✅ sent",
-  demo_sent: "✅ confirmed (demo, not sent)", screened: "screened only", scan: "screened",
-  followup: "follow-up", cancelled: "cancelled"};
-let after = 0, first = true;
-async function poll() {
-  try {
-    const {events} = await (await fetch("/api/events?after=" + after)).json();
-    for (const ev of events) {
-      after = ev.i + 1;
-      if (ev.channel !== "imessage") continue;
-      const feed = $("feed");
-      feed.querySelector(".empty")?.remove();
-      const item = document.createElement("div");
-      item.className = "item" + (first ? "" : " fresh");
-      const v = ev.result?.verdict;
-      item.innerHTML = `<div class="who"><span>📱 ${esc(ev.sender)} · ${new Date(ev.ts * 1000).toLocaleTimeString()}</span>
-        ${v ? `<span class="pill verdict ${esc(v)}">${esc(v)}</span>` : ""}</div><div>${esc(ev.text)}</div>
-        <div class="who" style="margin-top:4px"><span>${esc(kindLabel[ev.kind] || "")}</span></div>`;
-      feed.prepend(item);
-      if (!first && ev.result) renderResult(ev.result, ev.reply, `from iMessage (${ev.sender})`, ev.kind);
-    }
-  } catch (e) {}
-  first = false;
-  setTimeout(poll, 1500);
-}
-fetch("/api/status").then((r) => r.json()).then((s) => {
-  const parts = [`Auditor: ${s.mode.auditor}`, `Agent: ${s.mode.agent}`, `transfers: ${s.mode.transfers}`];
-  $("modeBadge").textContent = parts.join(" · ");
-  $("modeBadge").classList.toggle("mock", s.mode.auditor === "mock" || s.mode.transfers === "demo");
-  $("modeBadge").hidden = false;
-  if (s.handle) {
-    $("handleBadge").textContent = "📱 Text Warden: " + s.handle;
-    $("handleBadge").hidden = false;
-    document.querySelector(".phone .sub").textContent = s.handle + " · try it here";
-  }
-});
+idle();
 poll();
+loadWallets(false);
+setInterval(() => { if (!document.hidden) loadWallets(true); }, 30000);
 </script>
 </body>
 </html>
