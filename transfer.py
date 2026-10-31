@@ -182,6 +182,18 @@ def http_auditor(base_url, timeout=AUDITOR_TIMEOUT):
     return call
 
 
+def auditor_health(base_url, timeout=5):
+    """True if the configured Auditor answers its own /health. Startup-only visibility: the
+    gate itself never trusts this and still fails closed on every real request regardless."""
+    base = base_url.strip().rstrip("/")
+    try:
+        req = urllib.request.Request(f"{base}/health", headers={"User-Agent": "warden-agent/1.0"})
+        with urllib.request.urlopen(req, timeout=timeout) as response:
+            return response.status == 200
+    except Exception:
+        return False
+
+
 DEMO_ADDRESSES = {"0x" + digit * 40: name for digit, name in (("1", "low"), ("2", "medium"), ("3", "high"))}
 
 
@@ -343,6 +355,14 @@ def default_warden():
     return Warden(allowed, auditor, wallet.send_eth, demo=demo)
 
 
+def _warn_if_auditor_unreachable():
+    """Print a visible warning before anyone texts, instead of them finding out via a refusal."""
+    url = os.environ.get("WARDEN_AUDITOR_URL", "").strip()
+    if url and not auditor_health(url):
+        print(f"Warning: Auditor at {url} did not answer /health. "
+              "Every request will fail closed (refused) until it's back.")
+
+
 _default = None
 
 
@@ -400,6 +420,8 @@ def main(argv):
         warden = default_warden()
         if warden.auditor is no_auditor:
             warden.auditor, warden.demo = fixture_auditor(), True
+        else:
+            _warn_if_auditor_unreachable()
         warden.allowed.add("local")
         print("Warden chat. Demo addresses: 0x1111111111111111111111111111111111111111 (LOW), "
               "0x2222222222222222222222222222222222222222 (MEDIUM), 0x3333333333333333333333333333333333333333 (HIGH).")
@@ -417,6 +439,8 @@ def main(argv):
             return 1
         if not warden.allowed:
             print("Warning: WARDEN_ALLOWED_SENDERS is empty, so every sender will be ignored.")
+        if warden.auditor is not no_auditor and not warden.demo:
+            _warn_if_auditor_unreachable()
         host, port = os.environ.get("WARDEN_AGENT_HOST", "127.0.0.1"), int(os.environ.get("WARDEN_AGENT_PORT", "8787"))
         print(f"Listening on http://{host}:{port} (POST /message, GET /health)")
         serve(warden, host, port, token).serve_forever()

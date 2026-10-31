@@ -446,6 +446,41 @@ class AuditorClientTests(unittest.TestCase):
         self.assertEqual(call(A_LOW, 11155111)["verdict"], "LOW")
         self.assertEqual(seen["path"], f"/screen?address={A_LOW}&chainId=11155111")
 
+    def test_auditor_health_true_on_200(self):
+        class Healthy(BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(200)
+                self.end_headers()
+
+            def log_message(self, *args):
+                pass
+
+        self.assertTrue(transfer.auditor_health(self.serve(Healthy)))
+
+    def test_auditor_health_false_on_error_status(self):
+        class Unhealthy(BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(500)
+                self.end_headers()
+
+            def log_message(self, *args):
+                pass
+
+        self.assertFalse(transfer.auditor_health(self.serve(Unhealthy)))
+
+    def test_auditor_health_false_on_unreachable(self):
+        self.assertFalse(transfer.auditor_health("http://127.0.0.1:1", timeout=1))
+
+    def test_auditor_health_false_on_timeout(self):
+        class Hang(BaseHTTPRequestHandler):
+            def do_GET(self):
+                threading.Event().wait(2)
+
+            def log_message(self, *args):
+                pass
+
+        self.assertFalse(transfer.auditor_health(self.serve(Hang), timeout=0.2))
+
     def test_http_failures_raise_and_the_flow_refuses(self):
         class Broken(BaseHTTPRequestHandler):
             def do_GET(self):
