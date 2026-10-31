@@ -218,7 +218,7 @@ def run(allowed, public, dry_run, poll, self_chat=False, agent_handle=""):
                 continue  # Warden was not activated in this chat: stay silent
             print(f"[warden] <- {mask(handle)}: {text}")
             if action in ("greet", "end"):
-                reply = REPLY_TAG + (GREETING if action == "greet" else GOODBYE)
+                reply = REPLY_TAG + (greeting() if action == "greet" else GOODBYE)
                 if dry_run:
                     print(f"[warden] -> (dry run)\n{reply}\n")
                 elif send(reply, chat_guid, handle):
