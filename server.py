@@ -33,7 +33,10 @@ except ImportError:
 SCHEMA_PATH = Path(__file__).resolve().parent / "schema" / "auditor-output.schema.json"
 SCHEMA = json.loads(SCHEMA_PATH.read_text()) if SCHEMA_PATH.exists() else None
 
-PAGE = Path(__file__).resolve().parent / "dashboard.html"
+_ROOT = Path(__file__).resolve().parent
+_NEW_UI = _ROOT / "front" / "static" / "index.html"   # the redesigned page with the progress tracker
+PAGE = Path(os.environ["WARDEN_PAGE"]) if os.environ.get("WARDEN_PAGE") else (
+    _NEW_UI if _NEW_UI.exists() else _ROOT / "dashboard.html")
 AGENT_URL = os.environ.get("WARDEN_AGENT_URL", "http://127.0.0.1:8787")  # front.dashboard, the chat backend
 WALLET_TTL = 4      # seconds the wallet snapshot is reused (the page polls every 5)
 CACHE_TTL = 30      # seconds a successful result is reused for the same (address, chainId)
