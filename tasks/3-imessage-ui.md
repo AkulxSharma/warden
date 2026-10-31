@@ -58,7 +58,6 @@ Agent output: a plain-English reply string (iMessage-sized) plus the disclaimer.
 ## Open items (need Akul)
 
 - Which handle to use: a dedicated number or a dedicated Apple ID. Do not assume.
-- Confirm Night Hack is actually happening. Jobs notes from 10/28 say it was treated as dead.
 - Confirm the real submission deadline (9 PM is unverified).
 - Phantom track rules are not on disk.
 

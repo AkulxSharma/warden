@@ -4,11 +4,11 @@ Written 2026-10-30 (night), by the warden session. Read this before writing any 
 
 ## 0. Read first: facts that may be wrong
 
-- **Night Hack status conflicts.** Akul says the team is at Night Hack now (Fri 10/30). The jobs notes (`sessions/job-apply/summary.md`, UPDATE 2026-10-28) say Night Hack was treated as dead: no reply, never accepted, travel unbooked. Someone must confirm with Akul which one is true before anyone assumes a submission path or a prize track exists.
+- **Night Hack is live (Fri 10/30).** Akul is on site. Prizes include a Photon award ($1,000, Best iMessage Agent You Can Text).
 - **Submission deadline is unverified.** The "9 PM" deadline came from a relayed message, not from a sponsor page or the Night Hack site on disk. Confirm the real time and the submission form.
 - **Phantom sponsor: no spec on disk.** Nothing in the repo or memory describes Phantom's track, prize, or rules. Phantom is best known as a Solana wallet. Our scope is EVM only (no Solana). If the Phantom track requires Solana, the scope conflicts and Akul must decide. Do not guess at track rules.
 - **Other sponsors:** none documented on disk. Ask Akul for the full list before naming any.
-- **Prize rules that apply to us (from memory):** prize or grant money needs written ISS clearance first (Akul handles ISS himself). An SMS-only handle does not qualify for the prize, so the iMessage handle must be a real iMessage-capable line.
+- **Prize rules:** an SMS-only handle does not qualify for the Photon prize, so the iMessage handle must be a real iMessage-capable line.
 
 ## 1. Product (what Warden is)
 
@@ -113,7 +113,6 @@ Start: mock the Agent and the Auditor with fixture JSON until they land.
 
 ## 6. Open questions for Akul (block the build)
 
-1. Confirm Night Hack is actually happening (jobs notes say dead as of 10/28).
 2. Confirm the real submission deadline and form.
 3. Phantom track rules, and whether Solana is required.
 4. Full sponsor list.

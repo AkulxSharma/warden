@@ -71,6 +71,5 @@ ML trained on exploits, mutation testing, auto-generated tests, auto-fix, Solana
 
 ## Blockers
 
-- Night Hack status conflicts (Akul says we are at it; jobs notes from 10/28 say it is dead). Confirm first.
 - Submission deadline (9 PM) is unverified.
 - Phantom track rules are not on disk. Phantom is a Solana wallet, which conflicts with EVM only. Akul decides.
