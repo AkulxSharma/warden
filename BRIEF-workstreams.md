@@ -4,7 +4,7 @@ Written 2026-10-30 (night), by the warden session. Read this before writing any 
 
 ## 0. Read first: facts that may be wrong
 
-- **Night Hack status conflicts.** Akul says the team is at Night Hack now (Fri 10/30). The jobs notes (`sessions/job-apply/summary.md`, UPDATE 2026-10-28) say Night Hack was treated as dead: no reply, never accepted, travel unbooked. Someone must confirm with Akul which one is true before anyone assumes a submission path or a prize track exists.
+- **Night Hack is live (Fri 10/30).** Akul is on site. Prizes include a Photon award ($1,000, Best iMessage Agent You Can Text).
 - **Submission deadline is unverified.** The "9 PM" deadline came from a relayed message, not from a sponsor page or the Night Hack site on disk. Confirm the real time and the submission form.
 - **Phantom sponsor: no spec on disk.** Nothing in the repo or memory describes Phantom's track, prize, or rules. Phantom is best known as a Solana wallet. Our scope is EVM only (no Solana). If the Phantom track requires Solana, the scope conflicts and Akul must decide. Do not guess at track rules.
 - **Other sponsors:** none documented on disk. Ask Akul for the full list before naming any.
