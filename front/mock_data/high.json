@@ -1,0 +1,12 @@
+{
+  "target": "0x7702000000000000000000000000000000000003",
+  "chainId": 11155111,
+  "verdict": "HIGH",
+  "riskScore": 91,
+  "verified": false,
+  "findings": [
+    { "id": "eip7702-delegation", "severity": "high", "message": "This address delegates its code to another contract (EIP-7702), so whoever controls that contract controls this account." },
+    { "id": "delegatecall", "severity": "high", "message": "Bytecode contains DELEGATECALL, so it can run arbitrary outside code with its own storage and funds." },
+    { "id": "owner-only-selector", "severity": "medium", "message": "Exposes owner-only functions (upgradeTo, pause) that let one key change behavior or freeze funds." }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "target": "0x2000000000000000000000000000000000000002",
+  "chainId": 11155111,
+  "verdict": "MEDIUM",
+  "riskScore": 48,
+  "verified": true,
+  "findings": [
+    { "id": "tx-origin", "severity": "medium", "message": "Uses tx.origin for authorization, which a phishing contract can abuse." },
+    { "id": "unchecked-low-level-call", "severity": "medium", "message": "Makes a low-level call without checking whether it succeeded." }
+  ]
+}
