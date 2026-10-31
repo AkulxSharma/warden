@@ -27,3 +27,16 @@ WARDEN_AUDITOR=module:audit                 # audit(address, chain_id=None, call
 WARDEN_AGENT_REPLY=module:reply             # reply(result) -> str
 WARDEN_AGENT_FOLLOWUP=module:followup       # followup(result, question) -> str
 ```
+
+## Judging setup (Photon award: "Best iMessage Agent You Can Text")
+
+Judges text the handle from their own phones, so during judging the bot must answer anyone:
+
+1. Sign Messages on the demo Mac into a **dedicated Warden Apple ID** (never a personal number in the
+   submission; SMS-only does not qualify). Confirm it shows as iMessage (blue), not SMS.
+2. Grant Full Disk Access to the terminal app, then run and leave it running:
+   `caffeinate -i python3 -m front.imessage --any-sender`
+3. Put that Apple ID (email or number) in the submission as the reachable handle.
+
+`--any-sender` is only safe on the dedicated account: on a personal account it would reply to everyone.
+Group chats are ignored and each sender is capped at 10 replies a minute.

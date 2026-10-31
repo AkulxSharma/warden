@@ -10,7 +10,7 @@ Needs, once:
 
 Usage:
   python3 -m front.imessage --allow +15551234567,you@icloud.com
-  python3 -m front.imessage --any-sender      # only on a dedicated Warden Apple ID
+  caffeinate -i python3 -m front.imessage --any-sender   # judging: dedicated Warden Apple ID only
   python3 -m front.imessage --allow <your number> --self-chat   # demo: text yourself
   python3 -m front.imessage --dry-run ...     # print replies, send nothing
 
@@ -39,6 +39,7 @@ WHERE m.ROWID > ?
 ORDER BY m.ROWID
 """
 GROUP_CHAT_STYLE = 43
+RATE_LIMIT = 10   # replies per sender per minute
 
 SEND_TO_CHAT = """
 on run argv
@@ -118,7 +119,7 @@ def run(allowed, any_sender, dry_run, poll, self_chat=False):
           f"{' (dry run)' if dry_run else ''}. Ctrl+C to stop.")
 
     allowed_norm = {normalize(h) for h in allowed}
-    seen, recent = set(), {}
+    seen, recent, per_sender = set(), {}, {}
     while True:
         rows = db.execute(NEW_MESSAGES, (last,)).fetchall()
         for rowid, text, body, from_me, handle, chat_guid, style in rows:
@@ -139,9 +140,17 @@ def run(allowed, any_sender, dry_run, poll, self_chat=False):
             if time.time() - recent.get(key, 0) < 15:
                 continue  # self-chat can store one text as two rows
             recent[key] = time.time()
+            stamps = [t for t in per_sender.get(handle, []) if time.time() - t < 60]
+            per_sender[handle] = stamps + [time.time()]
+            if len(stamps) >= RATE_LIMIT:
+                continue  # public handle: ignore floods instead of replying to each
 
             print(f"[warden] <- {mask(handle)}: {text}")
-            out = handle_message(text, session=chat_guid or handle, channel="imessage", sender=mask(handle))
+            try:
+                out = handle_message(text, session=chat_guid or handle, channel="imessage", sender=mask(handle))
+            except Exception as exc:  # one bad message must not take the handle down
+                print(f"[warden] error on message {rowid}: {exc!r}", file=sys.stderr)
+                continue
             reply = REPLY_TAG + out["reply"]
             if dry_run:
                 print(f"[warden] -> (dry run)\n{reply}\n")
