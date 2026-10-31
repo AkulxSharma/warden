@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Warden</title>
+<link rel="icon" type="image/png" href="/img/icon.png">
 <style>
   /* Local draft. Native CSS + vanilla JS, no dependencies. One accent (cobalt); verdict colors carry state only.
      Shape rule: panels 16px, controls 10px, chips and the phone input are pills. */
@@ -24,13 +25,17 @@
       --bubble-in: #252830; --bubble-in-ink: #e9eaed;
     }
   }
+  /* Starfield: fixed behind everything, never receives clicks. Only drawn on the dark theme. */
+  #stars { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
+  header, main { position: relative; z-index: 1; }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--ink);
          font: 16px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif; }
   code, .mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
 
   header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 16px 24px; border-bottom: 1px solid var(--line); }
-  header h1 { font-size: 20px; margin: 0; letter-spacing: -0.02em; }
+  header h1 { font-size: 24px; font-weight: 700; margin: 0; letter-spacing: -0.02em; display: flex; align-items: center; gap: 10px; }
+  header h1 img { width: 38px; height: 38px; border-radius: 10px; }
   .badge { font-size: 13px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
   .badge.mock { border-color: var(--med); color: var(--med); }
   .badge.net { margin-left: auto; }
@@ -42,6 +47,7 @@
   .panel h2.label { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0 0 12px; font-weight: 600; }
 
   /* Hero */
+  .banner { display: block; width: 100%; height: 150px; object-fit: cover; object-position: right center; border-radius: 10px; margin: 0 0 22px; }
   .hero h2 { font-size: clamp(26px, 4.2vw, 38px); line-height: 1.1; letter-spacing: -0.03em; margin: 0 0 8px; font-weight: 650; }
   .hero p { margin: 0 0 20px; color: var(--muted); max-width: 52ch; }
   form { display: flex; gap: 8px; }
@@ -106,6 +112,9 @@
   .score .num { font-variant-numeric: tabular-nums; font-weight: 650; font-size: 22px; }
   .bar { height: 8px; border-radius: 99px; background: var(--line); margin-top: 6px; overflow: hidden; }
   .bar span { display: block; height: 100%; width: 0; border-radius: 99px; transition: width .9s var(--ease); }
+  .outcome { margin: 14px 0 0; font-weight: 650; }
+  .outcome small { display: block; font-weight: 400; color: var(--muted); font-size: 14px; }
+  .outcome.LOW { color: var(--low); } .outcome.MEDIUM { color: var(--med); } .outcome.HIGH { color: var(--high); }
   .meta { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0 6px; font-size: 13px; }
   .meta .chip { padding: 3px 10px; border-radius: 999px; background: var(--bg); border: 1px solid var(--line); }
   .meta .unverified { color: var(--med); border-color: var(--med); }
@@ -140,6 +149,32 @@
   .phone input { border-radius: 999px; }
   .phone button { border-radius: 999px; padding: 8px 16px; }
 
+  /* Wallets and transfers: read from the Auditor's /wallets through the runner, refreshed every few seconds. */
+  .wallets { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; }
+  .wal { padding: 12px 14px; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); min-width: 0; }
+  .wal b { display: block; font-size: 15px; }
+  .wal .role { font-size: 13px; color: var(--muted); }
+  .wal .addr { font: 12px ui-monospace, "SF Mono", Menlo, monospace; color: var(--muted); }
+  .wal .bal { font-size: 22px; font-weight: 650; font-variant-numeric: tabular-nums; margin-top: 4px; }
+  .wal .bal small { font-size: 13px; color: var(--muted); font-weight: 500; }
+  .wal .delta { font-size: 13px; font-weight: 700; margin-left: 6px; }
+  .wal .delta.up { color: var(--low); } .wal .delta.down { color: var(--high); }
+  .wal.target { opacity: .9; }
+  .txs { display: flex; flex-direction: column; margin-top: 6px; }
+  .txr { display: grid; grid-template-columns: 150px minmax(0, 1fr) auto; gap: 4px 16px; padding: 12px 0; border-top: 1px solid var(--line); font-size: 14px; align-items: start; }
+  .txr .t { color: var(--muted); font-size: 13px; }
+  .txr .path { font-weight: 600; overflow-wrap: anywhere; }
+  .txr .sub { color: var(--muted); font-size: 13px; grid-column: 2 / 4; overflow-wrap: anywhere; }
+  .txr .amt { font-variant-numeric: tabular-nums; font-weight: 650; text-align: right; }
+  .st-pill { font-size: 12px; font-weight: 700; padding: 1px 8px; border-radius: 999px; margin-left: 8px; }
+  .st-pill.confirmed { color: var(--low); background: var(--low-bg); }
+  .st-pill.failed, .st-pill.blocked { color: var(--high); background: var(--high-bg); }
+  @media (max-width: 560px) { .txr { grid-template-columns: 1fr auto; } .txr .t, .txr .sub { grid-column: 1 / 3; } }
+  @media (prefers-reduced-motion: no-preference) {
+    .txr.fresh, .wal.changed { animation: flash 1.8s var(--ease); }
+  }
+  .wmeta { font-size: 13px; color: var(--muted); margin-top: 12px; }
+
   /* Feed */
   .feed { display: flex; flex-direction: column; gap: 8px; max-height: 360px; overflow-y: auto; }
   .feed .item { padding: 10px 14px; border-radius: 10px; background: var(--bg); font-size: 14px; }
@@ -149,16 +184,17 @@
 </style>
 </head>
 <body>
+<canvas id="stars" aria-hidden="true"></canvas>
 <header>
-  <h1>Warden</h1>
+  <h1 id="logo"><img src="/img/icon.png" alt="">Warden</h1>
   <span class="badge net" id="handleBadge" hidden></span>
-  <span class="badge">Sepolia testnet</span>
   <span class="badge" id="modeBadge" hidden></span>
 </header>
 
 <main>
   <div class="left">
     <section class="panel hero">
+      <img class="banner" src="/img/hero.png" alt="A chain of three glass blocks leading to a gate">
       <h2>Check an address before you pay it.</h2>
       <p>Paste an address or text it to Warden. It reads the code on Sepolia and returns a risk signal with the reasons.</p>
 
@@ -177,15 +213,22 @@
         <button id="scanBtn">Screen</button>
       </form>
       <div class="demos">Try:
-        <button data-addr="0x1111111111111111111111111111111111111111">LOW</button>
-        <button data-addr="0x2222222222222222222222222222222222222222">MEDIUM</button>
-        <button data-addr="0x3333333333333333333333333333333333333333">HIGH (7702)</button>
-        <button data-addr="0x48F8686E6f0f4eB99a9ea89ee68C2ce93a4fBf32">HIGH (Drainer)</button>
-        <button data-addr="send 0.01 to 0x3333333333333333333333333333333333333333">send 0.01 to HIGH</button>
+        <button data-addr="0xE54Ea6a50DD6be272aEF623238E5d1DB66e9563B">LOW (akul.eth)</button>
+        <button data-addr="0x710a4A46AcA691e8CA1388F1DCa5b4A1Ed28eB2d">MEDIUM (vault.eth)</button>
+        <button data-addr="0x48F8686E6f0f4eB99a9ea89ee68C2ce93a4fBf32">HIGH (drainer.eth)</button>
+        <button data-addr="send 0.01 to 0x48F8686E6f0f4eB99a9ea89ee68C2ce93a4fBf32">send 0.01 to HIGH</button>
       </div>
     </section>
 
     <section class="panel result empty" id="result" aria-live="polite">Results appear here.</section>
+
+    <section class="panel" id="walletPanel">
+      <h2 class="label">Wallets, live</h2>
+      <div class="wallets" id="wallets"><div class="result empty">Loading wallet data.</div></div>
+      <h2 class="label" style="margin-top:22px">Transfers</h2>
+      <div class="txs" id="txs"></div>
+      <div class="wmeta" id="wmeta"></div>
+    </section>
 
     <section class="panel">
       <h2 class="label">Live iMessage feed</h2>
@@ -275,6 +318,13 @@ function chainIdle() {
 }
 
 /* ---- result ---- */
+/* What each verdict means for the person looking at it. Never says "safe". */
+const OUTCOME = {
+  LOW:    ["Check passed", "Nothing high-risk was found. This is a risk signal, not a guarantee.", "Notes"],
+  MEDIUM: ["Review needed", "Read the findings before you send anything.", "Findings to review"],
+  HIGH:   ["Errors found", "Do not send. The gate refuses this address.", "Errors"],
+};
+
 function gateLine(kind) {
   return {refused: ["Transfer refused", "high"], confirm: ["Waiting for YES", "medium"],
           screened: ["Screened only", "low"]}[kind];
@@ -306,13 +356,14 @@ function renderResult(result, reply, source, kind) {
         <div class="bar"><span id="barFill" style="background:${colors[result.verdict] || "var(--accent)"}"></span></div>
       </div>
     </div>
+    ${OUTCOME[result.verdict] ? `<p class="outcome ${esc(result.verdict)} rise">${OUTCOME[result.verdict][0]}<small>${OUTCOME[result.verdict][1]}</small></p>` : ""}
     <div class="meta">
       <span class="chip ${result.verified ? "verified" : "unverified"}">${result.verified ? "Verified source" : "Unverified: bytecode checks only"}</span>
       <span class="chip">${esc(chainNames[result.chainId] || "chain " + result.chainId)}</span>
       <span class="chip"><code>${esc(result.target)}</code></span>
     </div>
     ${findings.length
-      ? `<ul class="findings">${findings.map((f, i) => `<li class="${esc(f.severity.toLowerCase())} rise" style="--i:${i + 2}">
+      ? `<h2 class="label" style="margin:18px 0 0">${OUTCOME[result.verdict] ? OUTCOME[result.verdict][2] : "Findings"}</h2><ul class="findings">${findings.map((f, i) => `<li class="${esc(f.severity.toLowerCase())} rise" style="--i:${i + 2}">
            <div class="fid">${esc(f.severity.toUpperCase())} | ${esc(f.id)}</div>${esc(f.message)}</li>`).join("")}</ul>`
       : `<p>The scan flagged no issues. That does not rule out risks it does not check for.</p>`}
     <div class="disclaimer">${esc(disclaimer)}</div>
@@ -369,6 +420,66 @@ $("scanForm").addEventListener("submit", (e) => {
 document.querySelectorAll(".demos button").forEach((b) =>
   b.addEventListener("click", () => { $("scanInput").value = b.dataset.addr; chat(b.dataset.addr); }));
 
+/* ---- wallets and transfers (data comes from the Auditor's /wallets) ---- */
+const prevBal = {}, deltas = {}, seenTx = new Set();
+let walletsFirst = true;
+const when = (t) => new Date(t * 1000).toLocaleString([], {month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit"});
+function short(a) { return a ? a.slice(0, 6) + "..." + a.slice(-4) : "unknown"; }
+const who = (alias, addr) => alias ? `${alias} (${short(addr)})` : short(addr);
+
+function renderWallets(d) {
+  const box = $("wallets");
+  box.replaceChildren();
+  for (const w of d.wallets) {
+    const bal = Number(w.balanceEth), old = prevBal[w.address];
+    const changed = old !== undefined && old !== bal;
+    if (changed) deltas[w.address] = {d: bal - old, until: Date.now() + 20000};
+    prevBal[w.address] = bal;
+    const dl = deltas[w.address] && deltas[w.address].until > Date.now() ? deltas[w.address].d : 0;
+    const el = document.createElement("div");
+    el.className = "wal" + (w.kind === "target" ? " target" : "") + (changed ? " changed" : "");
+    el.innerHTML = `<b>${esc(w.alias)}</b><div class="role">${esc(w.role)}</div>
+      <div class="addr">${esc(short(w.address))}</div>
+      <div class="bal">${esc(w.balanceEth)} <small>ETH</small>${dl ? `<span class="delta ${dl > 0 ? "up" : "down"}">${dl > 0 ? "+" : "-"}${Math.abs(dl).toFixed(6)}</span>` : ""}</div>`;
+    box.appendChild(el);
+  }
+  const list = $("txs");
+  list.replaceChildren();
+  if (!d.transfers.length) {
+    const e = document.createElement("div");
+    e.className = "wmeta";
+    e.textContent = d.transfersError ? "No transfers to show. " + d.transfersError + "." : "No transfers yet.";
+    list.appendChild(e);
+  }
+  for (const t of d.transfers) {
+    const key = (t.hash || "blocked") + ":" + t.time + ":" + (t.to || "");
+    const fresh = !walletsFirst && !seenTx.has(key);
+    seenTx.add(key);
+    const row = document.createElement("div");
+    row.className = "txr" + (fresh ? " fresh" : "");
+    row.innerHTML = `<div class="t">${esc(when(t.time))}</div>
+      <div class="path">${esc(who(t.fromAlias, t.from))} to ${esc(who(t.toAlias, t.to))}<span class="st-pill ${esc(t.status)}">${esc(t.status)}</span></div>
+      <div class="amt">${t.valueEth ? esc(t.valueEth) + " ETH" : ""}</div>
+      <div class="sub">${t.status === "blocked" ? "Never sent. " + esc(t.reason || "") : t.hash ? `<a href="${esc(t.explorer)}" target="_blank" rel="noopener">${esc(short(t.hash))}</a> on Sepolia` : ""}</div>`;
+    list.appendChild(row);
+  }
+  walletsFirst = false;
+  $("wmeta").textContent = "Updated " + new Date().toLocaleTimeString() + ". Refreshes every 6 seconds." + (d.transfers.length && d.transfersError ? " " + d.transfersError + "." : "");
+}
+
+async function pollWallets() {
+  try {
+    const res = await fetch("/api/wallets");
+    const d = await res.json();
+    if (!res.ok || d.error) throw new Error(d.error || "bad response");
+    renderWallets(d);
+  } catch (e) {
+    $("wmeta").textContent = "Wallet data unavailable right now. Retrying.";
+  }
+  setTimeout(pollWallets, 6000);
+}
+pollWallets();
+
 /* ---- live feed ---- */
 const kindLabel = {refused: "refused", confirm: "asked for YES", sent: "sent",
   demo_sent: "confirmed (demo, not sent)", screened: "screened only", scan: "screened",
@@ -397,9 +508,12 @@ async function poll() {
 }
 fetch("/api/status").then((r) => r.json()).then((s) => {
   const parts = [`Auditor: ${s.mode.auditor}`, `Agent: ${s.mode.agent}`, `transfers: ${s.mode.transfers}`];
-  $("modeBadge").textContent = parts.join(", ");
-  $("modeBadge").classList.toggle("mock", s.mode.auditor === "mock" || s.mode.transfers === "demo");
-  $("modeBadge").hidden = false;
+  // The mode line stays out of the header. It only appears when the Auditor is the mock, so fake data is never mistaken for real.
+  const demo = s.mode.auditor === "mock";
+  $("modeBadge").textContent = "Demo data: the Auditor is a mock, not a live check";
+  $("modeBadge").classList.add("mock");
+  $("modeBadge").hidden = !demo;
+  $("logo").title = parts.join(", ");
   if (s.handle) {
     $("handleBadge").textContent = "Text Warden: " + s.handle;
     $("handleBadge").hidden = false;
@@ -407,6 +521,47 @@ fetch("/api/status").then((r) => r.json()).then((s) => {
   }
 });
 poll();
+
+/* ---- starfield: stars at random depth drift toward you; nearer stars are bigger and brighter ---- */
+(function () {
+  const cv = $("stars"), ctx = cv.getContext("2d");
+  const dark = matchMedia("(prefers-color-scheme: dark)");
+  const N = 340, DEPTH = 1000, SPEED = 0.7;     // slow on purpose: calm, not a screensaver
+  let w = 0, h = 0, dpr = 1, stars = [], raf = 0;
+  const spawn = (far) => ({x: (Math.random() - .5) * 2400, y: (Math.random() - .5) * 1600,
+                           z: far ? DEPTH : Math.random() * DEPTH, tint: Math.random() < .3});
+  function size() {
+    dpr = Math.min(devicePixelRatio || 1, 2);
+    w = innerWidth; h = innerHeight;
+    cv.width = w * dpr; cv.height = h * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  function frame(move) {
+    ctx.clearRect(0, 0, w, h);
+    if (!dark.matches) return;
+    const cx = w / 2, cy = h / 2, f = Math.min(w, h) * 0.9;
+    for (const st of stars) {
+      if (move) { st.z -= SPEED; if (st.z <= 1) Object.assign(st, spawn(true)); }
+      const k = f / st.z, sx = cx + st.x * k, sy = cy + st.y * k;
+      if (sx < 0 || sx > w || sy < 0 || sy > h) { if (move) Object.assign(st, spawn(true)); continue; }
+      const near = 1 - st.z / DEPTH;               // 0 far, 1 near
+      ctx.globalAlpha = 0.15 + near * 0.75;
+      ctx.fillStyle = st.tint ? "#9db8ff" : "#ffffff";
+      ctx.beginPath(); ctx.arc(sx, sy, 0.6 + near * 2.2, 0, 6.2832); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+  function loop() { frame(true); raf = requestAnimationFrame(loop); }
+  function start() {
+    cancelAnimationFrame(raf);
+    if (reduced) { frame(false); return; }        // reduced motion: one still frame, no movement
+    raf = requestAnimationFrame(loop);
+  }
+  size(); stars = Array.from({length: N}, () => spawn(false)); start();
+  addEventListener("resize", () => { size(); start(); });
+  dark.addEventListener("change", start);
+  document.addEventListener("visibilitychange", () => { if (document.hidden) cancelAnimationFrame(raf); else start(); });
+})();
 </script>
 </body>
 </html>
