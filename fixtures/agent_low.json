@@ -1,0 +1,8 @@
+{
+  "target": "0x2222222222222222222222222222222222222222",
+  "chainId": 11155111,
+  "verdict": "LOW",
+  "riskScore": 0,
+  "verified": true,
+  "findings": []
+}

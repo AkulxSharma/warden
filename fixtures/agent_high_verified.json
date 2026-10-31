@@ -1,0 +1,29 @@
+{
+  "target": "Vulnerable.sol",
+  "chainId": 11155111,
+  "verdict": "HIGH",
+  "riskScore": 100,
+  "verified": true,
+  "findings": [
+    {
+      "id": "reentrancy-state-after-call",
+      "severity": "high",
+      "message": "external call then state write (balances): checks-effects-interactions broken (in withdraw, line 20)"
+    },
+    {
+      "id": "unprotected-state-write",
+      "severity": "high",
+      "message": "public function writes state (owner) with no access control (in setOwner, line 24)"
+    },
+    {
+      "id": "arbitrary-send",
+      "severity": "high",
+      "message": "sends ETH to parameter 'to' with no msg.sender check (in emergencyWithdraw, line 31)"
+    },
+    {
+      "id": "tx-origin",
+      "severity": "medium",
+      "message": "uses tx.origin (phishing-prone auth) (in emergencyWithdraw, line 29)"
+    }
+  ]
+}
