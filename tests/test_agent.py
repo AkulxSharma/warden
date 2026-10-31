@@ -133,7 +133,7 @@ class ClaudeTests(unittest.TestCase):
         fake = Fake(bullets("a", "b"))
         agent.explain(self.scan, fake)
         kw = fake.calls[0]
-        self.assertEqual(kw["model"], "claude-opus-5-5")
+        self.assertEqual(kw["model"], agent.MODEL)
         self.assertEqual(kw["fallbacks"], "default")
         self.assertEqual(kw["betas"], [agent.FALLBACK_BETA])
         self.assertEqual(kw["output_config"]["effort"], "low")
@@ -289,7 +289,15 @@ class AnswerTests(unittest.TestCase):
             self.assertTrue(self.reply(text).startswith(text), text)
 
     def test_banned_word_is_blocked(self):
-        self.assertTrue(self.reply("Yes it is safe.", question="so it's safe right?").startswith(agent.CANT_ANSWER))
+        self.assertTrue(self.reply("Yes it is safe.").startswith(agent.CANT_ANSWER))
+
+    def test_asking_about_safety_gets_an_honest_reply_without_the_word(self):
+        for fake in (Fake("Yes it is safe."), Fake("It is secure."), Fake(exc=RuntimeError("down")),
+                     Fake("x", stop="refusal")):
+            reply = self.reply(client=fake, question="so it's safe right?")
+            self.assertTrue(reply.startswith(agent.NO_VOUCH), reply)
+            self.assertIsNone(agent._BANNED.search(reply.rsplit("\n", 1)[0]), reply)
+            self.assertTrue(reply.endswith(agent.DISCLAIMER))
 
     def test_failures_return_canned_reply_with_disclaimer(self):
         for fake in (Fake("x", stop="refusal"), Fake(None), Fake(exc=RuntimeError("down"))):

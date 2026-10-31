@@ -14,12 +14,13 @@ Usage: python3 agent.py scan.json ["follow-up question"]
 """
 import json
 import logging
+import os
 import re
 import sys
 
 log = logging.getLogger("warden.agent")
 
-MODEL = "claude-opus-5-5"
+MODEL = os.environ.get("WARDEN_AGENT_MODEL", "claude-opus-5-5")  # the guards run on any model
 FALLBACK_BETA = "server-side-fallback-2026-07-01"
 
 DISCLAIMER = "Risk signal, not a guarantee. Not a full audit."
@@ -27,6 +28,7 @@ UNVERIFIED = "Source unverified: bytecode checks only."
 NO_FINDINGS = "This scan did not flag anything. That does not mean no risk exists."
 BAD_SCAN = "Could not read this scan result. Please try again."
 CANT_ANSWER = "I can't answer that from this scan's results."
+NO_VOUCH = "I can't vouch for any contract. This scan is a risk signal only: it reports what it flagged and can't rule out other risk."
 
 MAX_BULLETS = 5
 MAX_FOLLOWUP_FINDINGS = 20
@@ -58,6 +60,7 @@ Rules:
 - If the question is about anything the scan does not list, or cannot be known from the scan, reply with exactly: This scan did not flag that.
   Add nothing else. Do not define the term. Do not say the contract is free of it.
 - Never say the contract is safe, secure, or risk-free. Never give exploit steps, links, or addresses.
+- Do not give financial advice or suggest actions the scan does not support.
 - You may repeat the verdict and score from the scan as given. Never change them."""
 
 BULLETS_FORMAT = {
@@ -263,6 +266,8 @@ def answer(scan, question, history=(), client=None):
         footer = DISCLAIMER if scan["verified"] else f"{UNVERIFIED}\n{DISCLAIMER}"
         question = _clip(str(question), QUESTION_MAX)
         shown, _ = _prepare(scan["findings"], MAX_FOLLOWUP_FINDINGS)
+        # "is it safe?" gets a fixed honest answer whenever Claude's own is rejected or missing
+        fallback = NO_VOUCH if _BANNED.search(question) else CANT_ANSWER
         reply = None
         if question:
             prior = [[_clip(str(q), QUESTION_MAX), _clip(str(a), ANSWER_MAX)]
@@ -280,7 +285,7 @@ def answer(scan, question, history=(), client=None):
                     log.warning("answer rejected: %s", why)
                 elif text:
                     reply = text
-        return f"{reply or CANT_ANSWER}\n{footer}"
+        return f"{reply or fallback}\n{footer}"
     except Exception:
         log.exception("answer failed")
         return f"{CANT_ANSWER}\n{DISCLAIMER}"
