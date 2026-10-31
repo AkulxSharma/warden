@@ -1,2 +1,5 @@
 anthropic>=2.3,<3
 eth-account>=0.13
+eth-utils>=4.0
+eth-hash[pycryptodome]>=0.7
+jsonschema>=4.20

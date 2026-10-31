@@ -1,0 +1,5 @@
+requests>=2.31
+eth-utils>=4.0
+eth-hash[pycryptodome]>=0.7
+jsonschema>=4.20
+solc-select>=1.0

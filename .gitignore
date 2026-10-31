@@ -9,3 +9,6 @@ fixtures/err.log
 __pycache__/
 data/
 !.env.example
+
+# Local hand-off prompts (contain temporary URLs)
+PROMPT-*.local.md

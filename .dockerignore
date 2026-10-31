@@ -1,0 +1,9 @@
+.venv
+.env
+.env.*
+.git
+.ruff_cache
+__pycache__
+fixtures
+tests
+tasks
