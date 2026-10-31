@@ -17,7 +17,13 @@ import agent  # noqa: E402
 
 FIX = ROOT / "fixtures"
 FIXTURES = ["agent_low.json", "agent_medium.json", "agent_high_unverified.json",
-            "agent_high_verified.json"]
+            "agent_high_verified.json", "auditor-output/low.json", "auditor-output/medium.json",
+            "auditor-output/high.json"]  # the last three are Akul's canonical Auditor mocks
+
+try:
+    import jsonschema
+except ImportError:
+    jsonschema = None
 
 
 def load(name):
@@ -114,6 +120,14 @@ class TemplateTests(unittest.TestCase):
         for scan in bad:
             self.assertEqual(agent.explain(scan, down()), agent.BAD_SCAN, scan)
             self.assertEqual(agent.answer(scan, "why?", client=down()), agent.BAD_SCAN, scan)
+
+
+@unittest.skipUnless(jsonschema, "jsonschema not installed")
+class SchemaTests(unittest.TestCase):
+    def test_every_fixture_matches_the_auditor_schema(self):
+        schema = json.loads((ROOT / "schema" / "auditor-output.schema.json").read_text(encoding="utf-8"))
+        for name in FIXTURES:
+            jsonschema.validate(load(name), schema)
 
 
 class ClaudeTests(unittest.TestCase):
@@ -244,9 +258,22 @@ class GuardTests(unittest.TestCase):
         known = {i for _, ids in agent.RISK_TERMS for i in ids}
         for _, needs in agent.RISK_TERMS:
             for fid in needs:
-                reason = self.v(f"Found {fid} here.", ids=known - {fid})
+                reason = self.v(f"Found {fid} here.", ids=known - needs)
                 self.assertTrue(reason and reason.startswith("unflagged"), fid)
                 self.assertIsNone(self.v(f"Found {fid} here.", ids={fid}), fid)
+
+    def test_natural_bullets_for_bytecode_ids_pass_only_on_their_own_finding(self):
+        cases = [
+            ("Contains DELEGATECALL, so outside code can run with this contract's storage.", "delegatecall-opcode"),
+            ("Reads tx.origin to check who is calling, which phishing can abuse.", "origin-opcode"),
+            ("Can self-destruct, wiping the contract and its code.", "selfdestruct-opcode"),
+            ("It is a proxy, so its admin can swap the logic behind it.", "eip1967-proxy"),
+            ("The owner can mint, pause or blacklist.", "admin-selectors"),
+            ("Another contract controls this address through EIP-7702 delegation.", "eip7702-delegation"),
+        ]
+        for text, fid in cases:
+            self.assertIsNone(self.v(text, ids={fid}), text)
+            self.assertTrue(self.v(text, ids={"unchecked-low-level-call"}).startswith("unflagged"), text)
 
     def test_fixture_ids_are_all_covered_by_the_keyword_map(self):
         covered = {i for _, ids in agent.RISK_TERMS for i in ids}

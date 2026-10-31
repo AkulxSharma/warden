@@ -100,11 +100,15 @@ RISK_TERMS = [(re.compile(p, re.I), ids) for p, ids in {
     r"reentran": {"reentrancy-state-after-call"},
     r"access control|unprotected": {"unprotected-state-write"},
     r"arbitrary|any address": {"arbitrary-send"},
-    r"delegatecall": {"delegatecall"},
-    r"self.?destruct": {"dangerous-selfdestruct"},
-    r"tx[.\- ]?origin|phishing": {"tx-origin"},
+    r"delegatecall|callcode": {"delegatecall", "delegatecall-opcode"},
+    r"self.?destruct": {"dangerous-selfdestruct", "selfdestruct-opcode"},
+    r"tx[.\- ]?origin|origin-opcode|phishing": {"tx-origin", "origin-opcode"},
     r"return value|unchecked": {"unchecked-low-level-call"},
     r"7702|delegation": {"eip7702-delegation"},
+    r"proxy|upgrad": {"eip1967-proxy", "admin-selectors"},
+    r"\bmint|pause|blacklist|owner-only|admin-selectors": {"admin-selectors"},
+    r"unverified-source": {"unverified-source"},
+    r"sim-revert|sim-drains-sender": {"sim-revert", "sim-drains-sender"},
     r"honeypot|rug.?pull|backdoor|scam": set(),
 }.items()]
 
