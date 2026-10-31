@@ -10,6 +10,7 @@ GET  /api/events?after=N   exchanges from every channel (live iMessage feed)
 import argparse
 import json
 import os
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -18,6 +19,8 @@ from . import services
 from .pipeline import handle_message, read_events
 
 PAGE = Path(__file__).parent / "static" / "index.html"
+WEB_RATE_LIMIT = 20   # messages per visitor per minute; the page is public and replies cost Claude calls
+_hits = {}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -50,6 +53,13 @@ class Handler(BaseHTTPRequestHandler):
             body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}")
         except json.JSONDecodeError:
             return self._send(400, {"error": "bad json"})
+        visitor = self.headers.get("CF-Connecting-IP") or self.headers.get("X-Forwarded-For", "").split(",")[0] \
+            or self.client_address[0]
+        recent = [t for t in _hits.get(visitor, []) if time.time() - t < 60]
+        _hits[visitor] = recent + [time.time()]
+        if len(recent) >= WEB_RATE_LIMIT:
+            return self._send(429, {"reply": "Too many messages. Wait a minute and try again.",
+                                    "result": None, "kind": "rate_limited"})
         text = str(body.get("text", ""))[:2000]
         session = "web:" + str(body.get("session", "default"))[:64]
         self._send(200, handle_message(text, session=session, channel="web", sender="dashboard"))
