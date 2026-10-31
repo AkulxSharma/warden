@@ -33,7 +33,7 @@ HELP = ("Warden checks an address before you pay it.\n"
         "Sepolia testnet only. Risk signal, not a guarantee.")
 ASK_ADDRESS = "Send me a 0x address to screen, or \"send 0.01 to 0x…\"."
 TX_HASH = "That looks like a transaction hash. Send the address you're about to pay instead."
-ENS = "ENS names aren't supported yet. Send the 0x address instead."
+ENS = "I don't know that name. Send the 0x address instead."
 LINK_NO_ADDRESS = "I couldn't find an address in that link. Send the 0x address or an explorer link with one."
 CHECK_FAILED = "Refused: the risk check could not run, so nothing was sent. Try again in a minute."
 SCAN_FAILED = "The risk check could not run right now. Try again in a minute."
