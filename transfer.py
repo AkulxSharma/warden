@@ -166,19 +166,35 @@ def gate(scan):
     return "confirm"
 
 
-def http_auditor(base_url, timeout=AUDITOR_TIMEOUT):
+def http_auditor(base_url, timeout=AUDITOR_TIMEOUT, retries=1, backoff=0.5, sleep=time.sleep):
+    """One retry on a transient failure (timeout, connection error, 5xx), with a short pause
+    between attempts. The two attempts split the original timeout budget so a fully offline
+    Auditor still fails in roughly the documented AUDITOR_TIMEOUT, not up to twice that."""
     base = base_url.strip().rstrip("/")
     if not re.match(r"https?://", base):
         raise ValueError("WARDEN_AUDITOR_URL must start with http:// or https://")
+    attempts = retries + 1
+    per_attempt = max(timeout / attempts, 1)
 
-    def call(address, chain_id):
+    def once(address, chain_id):
         query = urllib.parse.urlencode({"address": address, "chainId": chain_id})
         req = urllib.request.Request(
             f"{base}/screen?{query}", headers={"User-Agent": "warden-agent/1.0", "Accept": "application/json"})
-        with urllib.request.urlopen(req, timeout=timeout) as response:  # non-2xx raises
+        with urllib.request.urlopen(req, timeout=per_attempt) as response:  # non-2xx raises
             if response.status != 200:
                 raise AuditorError(f"HTTP {response.status}")
             return json.loads(response.read(1_000_000))
+
+    def call(address, chain_id):
+        last = None
+        for attempt in range(attempts):
+            try:
+                return once(address, chain_id)
+            except Exception as e:
+                last = e
+                if attempt < attempts - 1:
+                    sleep(backoff)
+        raise last
     return call
 
 

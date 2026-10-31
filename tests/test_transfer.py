@@ -7,6 +7,7 @@ import copy
 import json
 import sys
 import threading
+import time
 import unittest
 import urllib.error
 import urllib.request
@@ -480,6 +481,57 @@ class AuditorClientTests(unittest.TestCase):
                 pass
 
         self.assertFalse(transfer.auditor_health(self.serve(Hang), timeout=0.2))
+
+    def test_http_auditor_retries_once_then_succeeds(self):
+        calls = {"n": 0}
+
+        class FlakyThenOk(BaseHTTPRequestHandler):
+            def do_GET(self):
+                calls["n"] += 1
+                if calls["n"] == 1:
+                    self.send_response(500)
+                    self.end_headers()
+                    return
+                body = json.dumps(scan_for(A_LOW)).encode()
+                self.send_response(200)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *args):
+                pass
+
+        slept = []
+        call = transfer.http_auditor(self.serve(FlakyThenOk), backoff=0.01, sleep=slept.append)
+        self.assertEqual(call(A_LOW, 11155111)["verdict"], "LOW")
+        self.assertEqual(calls["n"], 2)
+        self.assertEqual(slept, [0.01])  # paused once, between the two attempts
+
+    def test_http_auditor_gives_up_after_retries_exhausted(self):
+        calls = {"n": 0}
+
+        class AlwaysBroken(BaseHTTPRequestHandler):
+            def do_GET(self):
+                calls["n"] += 1
+                self.send_response(500)
+                self.end_headers()
+
+            def log_message(self, *args):
+                pass
+
+        call = transfer.http_auditor(self.serve(AlwaysBroken), retries=1, backoff=0.01, sleep=lambda s: None)
+        with self.assertRaises(Exception):
+            call(A_LOW, 11155111)
+        self.assertEqual(calls["n"], 2)  # exactly one retry, not an unbounded loop
+
+    def test_http_auditor_splits_timeout_budget_across_attempts(self):
+        # A fully offline host should still fail in roughly the original timeout, not
+        # up to retries+1 times that, by splitting the budget across attempts.
+        call = transfer.http_auditor("http://127.0.0.1:1", timeout=2, retries=1, backoff=0, sleep=lambda s: None)
+        start = time.time()
+        with self.assertRaises(Exception):
+            call(A_LOW, 11155111)
+        self.assertLess(time.time() - start, 3)
 
     def test_http_failures_raise_and_the_flow_refuses(self):
         class Broken(BaseHTTPRequestHandler):
