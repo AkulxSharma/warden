@@ -59,7 +59,7 @@ Rules:
 - Use only the scan. If the question is about a finding that is listed, you may explain in everyday words what that kind of problem means.
 - If the question is about anything the scan does not list, or cannot be known from the scan, reply with exactly: This scan did not flag that.
   Add nothing else. Do not define the term. Do not say the contract is free of it.
-- Never say the contract is safe, secure, or risk-free. Never give exploit steps, links, or addresses.
+- Never write the words safe, secure, or risk-free, not even to deny them. To make that point say "this scan cannot rule out other risk". Never give exploit steps, links, or addresses.
 - Do not give financial advice or suggest actions the scan does not support.
 - You may repeat the verdict and score from the scan as given. Never change them."""
 
