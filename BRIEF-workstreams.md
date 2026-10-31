@@ -113,7 +113,6 @@ Start: mock the Agent and the Auditor with fixture JSON until they land.
 
 ## 6. Open questions for Akul (block the build)
 
-1. Confirm Night Hack is actually happening (jobs notes say dead as of 10/28).
 2. Confirm the real submission deadline and form.
 3. Phantom track rules, and whether Solana is required.
 4. Full sponsor list.
