@@ -96,6 +96,8 @@ class SendTests(unittest.TestCase):
         self.assertEqual(tx["maxPriorityFeePerGas"], GWEI)
         self.assertEqual(tx["maxFeePerGas"], 2 * GWEI + GWEI)
         self.assertEqual(tx_hash, "0x" + keccak(HexBytes(raw)).hex())
+        nonce_call = next(p for m, p in rpc.calls if m == "eth_getTransactionCount")
+        self.assertEqual(nonce_call, [self.account.address, "pending"])  # queued transactions count
 
     def test_wrong_chain_sends_nothing(self):
         for chain in (hex(1), hex(8453), "0x0"):
@@ -110,6 +112,8 @@ class SendTests(unittest.TestCase):
                      ("0x123", 1), ("", 1), (TO + "00", 1), (None, 1), (TO, 1, 1), (TO, 1, 0), (TO, 1, 8453)):
             self.assert_send_error(*args)
         self.assertEqual(rpc.calls, [])
+        for bad_address in ("0x123", "", TO + "00", None):
+            self.assertIn("address is not valid", str(self.assert_send_error(bad_address, 1)))
 
     def test_the_cap_follows_the_environment(self):
         rpc = self.rpc()
