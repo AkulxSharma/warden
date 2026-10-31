@@ -161,7 +161,7 @@ def run(allowed, public, dry_run, poll, self_chat=False, agent_handle=""):
     last = db.execute("SELECT IFNULL(MAX(ROWID), 0) FROM message").fetchone()[0]
     who = ", ".join(mask(h) for h in allowed) or "no testers"
     if public:
-        who += " + anyone texting an address, link or 'warden'"
+        who += " + anyone, but only in chats that started with 'Hey Warden'"
     print(f"[warden] agent handle {mask(agent_handle) if agent_handle else '(WARDEN_AGENT_HANDLE not set)'}")
     print(f"[warden] answering {who}"
           f"{' (dry run)' if dry_run else ''}. Ctrl+C to stop.")
