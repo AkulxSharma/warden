@@ -50,6 +50,37 @@ ORDER BY m.ROWID
 GROUP_CHAT_STYLE = 43
 RATE_LIMIT = 10   # replies per sender per minute
 
+# Warden stays silent in a chat until someone texts "Hey Warden", and goes silent again on "End Warden".
+ACTIVATION = re.compile(r"^\s*hey[\s,!.]+warden\b[\s,.!:;-]*", re.I)
+END = re.compile(r"^\s*(end|stop|bye)\s+warden\b", re.I)
+CHAT_IDLE_SECONDS = 1800   # a chat that has been quiet this long needs "Hey Warden" again
+GREETING = ("Warden here. I check an address before you pay it. Text \"send 0.001 to akul.eth\" "
+            "or just an address to screen it. Text \"End Warden\" when you're done. "
+            "Sepolia testnet only. Risk signal, not a guarantee.")
+GOODBYE = "Warden session ended. Text \"Hey Warden\" to start again."
+
+
+def decide(text, chat_key, open_chats, now):
+    """What to do with a text given the chats Warden is active in.
+
+    Returns (action, body): ("ignore", None) stay silent, ("greet", None) Warden was just activated,
+    ("end", None) the user ended the session, ("handle", text) pass text to the pipeline.
+    Mutates open_chats (chat key -> time of last activity).
+    """
+    active = now - open_chats.get(chat_key, 0) <= CHAT_IDLE_SECONDS
+    if END.match(text):
+        open_chats.pop(chat_key, None)
+        return ("end", None) if active else ("ignore", None)
+    match = ACTIVATION.match(text)
+    if match:
+        open_chats[chat_key] = now
+        rest = text[match.end():].strip()
+        return ("handle", rest) if rest else ("greet", None)
+    if active:
+        open_chats[chat_key] = now
+        return ("handle", text)
+    return ("ignore", None)
+
 SEND_TO_CHAT = """
 on run argv
   tell application "Messages" to send (item 1 of argv) to chat id (item 2 of argv)
