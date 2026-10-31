@@ -533,6 +533,71 @@ class AuditorClientTests(unittest.TestCase):
             call(A_LOW, 11155111)
         self.assertLess(time.time() - start, 3)
 
+    def test_cached_auditor_hits_cache_within_ttl(self):
+        calls = {"n": 0}
+
+        def inner(address, chain_id):
+            calls["n"] += 1
+            return scan_for(address)
+
+        clock = [1000.0]
+        call = transfer.cached_auditor(inner, ttl=60, clock=lambda: clock[0])
+        self.assertEqual(call(A_LOW, 11155111)["target"], A_LOW)
+        self.assertEqual(call(A_LOW, 11155111)["target"], A_LOW)
+        self.assertEqual(calls["n"], 1)  # second call was served from cache
+
+    def test_cached_auditor_refetches_after_ttl_expires(self):
+        calls = {"n": 0}
+
+        def inner(address, chain_id):
+            calls["n"] += 1
+            return scan_for(address)
+
+        clock = [1000.0]
+        call = transfer.cached_auditor(inner, ttl=60, clock=lambda: clock[0])
+        call(A_LOW, 11155111)
+        clock[0] += 61  # past the TTL
+        call(A_LOW, 11155111)
+        self.assertEqual(calls["n"], 2)
+
+    def test_cached_auditor_never_caches_a_failure(self):
+        calls = {"n": 0}
+
+        def inner(address, chain_id):
+            calls["n"] += 1
+            raise transfer.AuditorError("down")
+
+        call = transfer.cached_auditor(inner, ttl=60)
+        for _ in range(3):
+            with self.assertRaises(transfer.AuditorError):
+                call(A_LOW, 11155111)
+        self.assertEqual(calls["n"], 3)  # no attempt was ever cached
+
+    def test_cached_auditor_keys_by_address_and_chain_separately(self):
+        calls = {"n": 0}
+
+        def inner(address, chain_id):
+            calls["n"] += 1
+            return scan_for(address, verdict="LOW" if address == A_LOW else "HIGH")
+
+        call = transfer.cached_auditor(inner, ttl=60)
+        call(A_LOW, 11155111)
+        call(A_HIGH, 11155111)  # different address: separate cache entry, separate call
+        call(A_LOW, 11155111)  # back to the first: still cached
+        self.assertEqual(calls["n"], 2)
+
+    def test_cached_auditor_returns_independent_copies(self):
+        def inner(address, chain_id):
+            return scan_for(address, findings=[dict(HIGH_FINDING)])
+
+        call = transfer.cached_auditor(inner, ttl=60)
+        first = call(A_LOW, 11155111)
+        first["verdict"] = "TAMPERED"
+        first["findings"][0]["severity"] = "low"
+        second = call(A_LOW, 11155111)
+        self.assertEqual(second["verdict"], "LOW")
+        self.assertEqual(second["findings"][0]["severity"], "high")
+
     def test_http_failures_raise_and_the_flow_refuses(self):
         class Broken(BaseHTTPRequestHandler):
             def do_GET(self):

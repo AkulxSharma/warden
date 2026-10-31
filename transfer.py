@@ -16,6 +16,7 @@ Settings (env or .env): WARDEN_ALLOWED_SENDERS (comma list of handles), WARDEN_A
 WARDEN_USE_FIXTURES=1 (demo: only 0x1111..., 0x2222..., 0x3333... get Akul's LOW/MEDIUM/HIGH
 fixtures, every other address is refused), SEPOLIA_PRIVATE_KEY, SEPOLIA_RPC_URL, WARDEN_MAX_ETH, ANTHROPIC_API_KEY.
 """
+import copy
 import hmac
 import json
 import logging
@@ -198,6 +199,31 @@ def http_auditor(base_url, timeout=AUDITOR_TIMEOUT, retries=1, backoff=0.5, slee
     return call
 
 
+AUDITOR_CACHE_TTL = 120  # seconds: re-screening the same address this soon reuses the result
+
+
+def cached_auditor(inner, ttl=AUDITOR_CACHE_TTL, clock=time.time):
+    """Wraps an auditor call with a short, per-(address, chain) TTL cache. Only successful
+    results are cached; a failure is never cached, so it never blocks a retry on the next
+    message. Thread-safe for the threaded HTTP server. Returns a deep copy each time so no
+    caller can mutate the cached entry."""
+    cache = {}
+    lock = threading.Lock()
+
+    def call(address, chain_id):
+        key = (address.lower(), chain_id)
+        now = clock()
+        with lock:
+            hit = cache.get(key)
+            if hit is not None and hit[0] > now:
+                return copy.deepcopy(hit[1])
+        result = inner(address, chain_id)  # raises straight through on failure: never cached
+        with lock:
+            cache[key] = (now + ttl, result)
+        return copy.deepcopy(result)
+    return call
+
+
 def auditor_health(base_url, timeout=5):
     """True if the configured Auditor answers its own /health. Startup-only visibility: the
     gate itself never trusts this and still fails closed on every real request regardless."""
@@ -363,7 +389,7 @@ def default_warden():
     url = os.environ.get("WARDEN_AUDITOR_URL", "").strip()
     demo = False
     if url:
-        auditor = http_auditor(url)
+        auditor = cached_auditor(http_auditor(url))
     elif os.environ.get("WARDEN_USE_FIXTURES") == "1":
         auditor, demo = fixture_auditor(), True
     else:
