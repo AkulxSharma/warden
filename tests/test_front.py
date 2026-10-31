@@ -196,3 +196,11 @@ class IMessageHelpersTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class AliasParseTest(unittest.TestCase):
+    def test_known_alias_parses_as_its_address_and_unknown_stays_ens(self):
+        import aliases
+        p = parse("send 0.01 to Akul.eth")
+        self.assertEqual((p.kind, p.address), ("transfer", aliases.resolve("akul.eth")))
+        self.assertEqual(parse("send 0.01 to eve.eth").kind, "ens")

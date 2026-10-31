@@ -32,6 +32,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import agent
+import aliases
 import wallet
 
 log = logging.getLogger("warden.transfer")
@@ -86,17 +87,26 @@ def parse_intent(text):
         return {"kind": "bad", "error": error}
 
     addresses = ADDR.findall(t)
-    if len(addresses) > 1:
-        return bad("I can only handle one address at a time.")
+    names = aliases.NAME.findall(t)
+    if re.search(r"\balias\b", t, re.I) and (addresses or names or "=" in t):
+        return bad("Names can only be changed in code, not by text. Nothing changed.")
+    if len(addresses) + len(names) > 1:
+        return bad("I can only handle one address or name at a time.")
+    alias = None
+    if names:
+        alias, address = names[0].lower(), aliases.resolve(names[0])
+        if address is None:
+            return bad("I don't know that name. Send the 0x address instead.")
+        addresses = [address]
     if not addresses:
         return {"kind": "question", "text": t}
-    rest = ADDR.sub(" ", t)
+    rest = aliases.NAME.sub(" ", ADDR.sub(" ", t))
     if OTHER_CHAIN.search(rest):
         return bad("I only work on Sepolia test ETH right now.")
     if not VERB.search(rest):
-        return {"kind": "screen", "address": addresses[0]}
+        return {"kind": "screen", "address": addresses[0], "alias": alias}
     if OTHER_ASSET.search(rest):
-        return bad("I only send Sepolia test ETH.")
+        return bad("Warden handles Ethereum on Sepolia only, and I only send Sepolia test ETH.")
     numbers = NUMBER.findall(rest)
     if not numbers:
         return bad("How much? Example: send 0.01 to 0x...")
@@ -107,7 +117,7 @@ def parse_intent(text):
         return bad("The amount must be above zero.")
     if -amount.as_tuple().exponent > 18:
         return bad("That amount has too many decimal places.")
-    return {"kind": "transfer", "address": addresses[0], "amount": amount}
+    return {"kind": "transfer", "address": addresses[0], "amount": amount, "alias": alias}
 
 
 def address_problem(address):
@@ -192,6 +202,10 @@ def no_auditor(address, chain_id):
     raise AuditorError("no Auditor is configured")
 
 
+def label_for(alias, address):
+    return f"{alias} -> {short(address)}" if alias else short(address)
+
+
 def short(address):
     return f"{address[:6]}...{address[-4:]}"
 
@@ -201,6 +215,7 @@ class Pending:
     address: str
     wei: int
     created: float
+    alias: str = None
 
 
 class Warden:
@@ -247,7 +262,7 @@ class Warden:
         self.pending.pop(who, None)
         if kind == "bad":
             return intent["error"]
-        address = intent["address"]
+        address, alias = intent["address"], intent.get("alias")
         problem = address_problem(address)
         if problem:
             return problem
@@ -267,9 +282,9 @@ class Warden:
         if gate(scan) == "refuse":
             return self.explain(scan, note="Not sent: I won't send to an address with this risk signal." + label)
         reply = self.explain(scan, note=(
-            f"Send {wallet.format_eth(wei)} ETH to {short(address)} on Sepolia? "
+            f"Send {wallet.format_eth(wei)} ETH to {label_for(alias, address)} on Sepolia? "
             f"Reply YES within {PENDING_TTL // 60} min to send, or NO to cancel." + label))
-        self.pending[who] = Pending(address, wei, self.clock())  # only once the user has been asked
+        self.pending[who] = Pending(address, wei, self.clock(), alias)  # only once the user has been asked
         return reply
 
     def _audit(self, address):
@@ -301,7 +316,7 @@ class Warden:
                 return (f"The transfer may have gone out but I could not confirm it. "
                         f"Check {wallet.EXPLORER_TX}{e.tx_hash} before trying again.")
             return f"The transfer failed: {e}. Nothing was sent."
-        return f"Sent {wallet.format_eth(pending.wei)} ETH to {short(pending.address)} on Sepolia.\n{wallet.EXPLORER_TX}{tx_hash}"
+        return f"Sent {wallet.format_eth(pending.wei)} ETH to {label_for(pending.alias, pending.address)} on Sepolia.\n{wallet.EXPLORER_TX}{tx_hash}"
 
     def _followup(self, who, text):
         last = self.last.get(who)

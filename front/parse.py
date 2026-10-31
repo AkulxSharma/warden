@@ -7,6 +7,8 @@ import re
 from dataclasses import dataclass, field
 from urllib.parse import urlparse
 
+import aliases
+
 SEPOLIA = 11155111
 
 ADDRESS_RE = re.compile(r"(?<![0-9a-fA-F])0x[0-9a-fA-F]{40}(?![0-9a-fA-F])")
@@ -87,6 +89,10 @@ def parse(text):
     text = (text or "").strip()
     if not text:
         return Parsed("text")
+    if not ADDRESS_RE.search(text):  # a known alias (aliases.py) stands in for its address
+        names = aliases.NAME.findall(text)
+        if len(names) == 1 and aliases.resolve(names[0]):
+            text = text.replace(names[0], aliases.resolve(names[0]))
 
     urls = [u for u in URL_RE.findall(text) if not ADDRESS_RE.fullmatch(u)]
     is_link = bool(urls)

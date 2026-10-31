@@ -566,3 +566,38 @@ class ServerTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class AliasTests(unittest.TestCase):
+    AKUL = "0xE54Ea6a50DD6be272aEF623238E5d1DB66e9563B"
+
+    def test_known_alias_resolves_and_auditor_gets_the_address(self):
+        rig = Rig()
+        ask = rig.say("send 0.01 to Akul.ETH")
+        self.assertEqual(rig.audit_calls, [(self.AKUL, 11155111)])
+        self.assertIn("akul.eth -> 0xE54E...563B", ask)
+        self.assertEqual(rig.say("YES").count("akul.eth -> 0xE54E...563B"), 1)
+        self.assertEqual(rig.sent, [(self.AKUL, 10**16)])
+
+    def test_unknown_alias_refuses_without_calling_the_auditor(self):
+        rig = Rig()
+        self.assertIn("don't know that name", rig.say("send 0.01 to eve.eth"))
+        self.assertEqual((rig.audit_calls, rig.sent), ([], []))
+
+    def test_alias_setting_text_changes_nothing(self):
+        rig = Rig()
+        before = dict(transfer.aliases.ALIASES)
+        for text in (f"alias eve.eth = {A_LOW}", f"alias akul.eth = {A_LOW}", "set alias akul.eth = bob"):
+            self.assertIn("Nothing changed", rig.say(text))
+        self.assertEqual(transfer.aliases.ALIASES, before)
+        self.assertEqual((rig.audit_calls, rig.sent), ([], []))
+
+    def test_name_plus_address_is_ambiguous(self):
+        rig = Rig()
+        self.assertIn("one address or name", rig.say(f"send 0.01 to akul.eth {A_LOW}"))
+        self.assertEqual(rig.audit_calls, [])
+
+    def test_btc_is_rejected_even_with_an_alias(self):
+        rig = Rig()
+        self.assertIn("Ethereum on Sepolia only", rig.say("send 0.01 btc to akul.eth"))
+        self.assertEqual(rig.audit_calls, [])

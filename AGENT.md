@@ -38,6 +38,10 @@ These are enforced in code and covered by tests in `tests/test_transfer.py` and 
 - **The key stays in `.env`.** It is never logged, never in an error message, never in a reply.
 - **Never says "safe".** Generated text is checked for banned words, claims about risks that are not in this scan, links, addresses, and length. Anything that fails is replaced by the Auditor's own message or a fixed reply.
 
+## Aliases
+
+`aliases.py` holds a small name book (`andrew.eth` is the funded agent wallet, `akul.eth` is the receiver). `send 0.01 to akul.eth` resolves the name before the Auditor call, so the Auditor only sees the 0x address, and the confirmation reads `akul.eth -> 0xE54E...563B`. Names match exactly, ignoring case. Unknown names get "I don't know that name" with no Auditor call. A text such as `alias x = 0x...` changes nothing; the book is edited in code only. There is no ENS lookup. `akul.eth` is a placeholder address until Akul sets his own.
+
 ## Connecting the iMessage side
 
 Python:
