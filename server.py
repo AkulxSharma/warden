@@ -158,6 +158,22 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def do_GET(self):
+        if urlparse(self.path).path == "/api/events":
+            # live feed for the progress tracker; /api/status is deliberately NOT proxied (it shows the agent handle)
+            query = urlparse(self.path).query
+            try:
+                with urllib.request.urlopen(f"{AGENT_URL}/api/events?{query}", timeout=10) as res:
+                    payload, status = res.read(), res.status
+            except (urllib.error.URLError, OSError):
+                return self._json(502, {"error": "agent offline", "events": []})
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(payload)))
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(payload)
+            return
         if urlparse(self.path).path in ("/", "/dashboard") and PAGE.exists():
             data = PAGE.read_bytes()
             self.send_response(200)

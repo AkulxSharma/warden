@@ -54,6 +54,15 @@ Show the main wallet (the agent wallet, `andrew.eth`) and the other wallet (the 
 
 The page must work from a public URL on another device, not just localhost. Note one real constraint: the iMessage events live on the Mac that runs the bot. A page hosted on Vercel can only show them if it calls a public API that reaches that Mac (the existing public tunnel), and that API must allow cross-origin requests. The simplest reliable setup for tonight is to serve the page from the same Mac behind the tunnel. If you also want a Vercel copy, make it a static page that reads the tunnel's API and shows "Reconnecting" cleanly when the Mac is unreachable.
 
+## Making the UI deployable on Vercel (do this from the start)
+
+Akul will put the finished UI on Vercel as a static site that talks to the Mac over the public tunnel. So:
+
+- Every network call goes through one base URL: `var API = (window.WARDEN_API || "").replace(/\/$/, "");`, then `fetch(API + "/wallets")`, `fetch(API + "/api/events?after=" + n)`, `fetch(API + "/api/message", ...)`. When `WARDEN_API` is not set the base is empty and the page works same-origin, as it does when served from the Mac. A deploy step injects `window.WARDEN_API`; do not hard-code any URL.
+- When `API` is not empty, send the header `ngrok-skip-browser-warning: 1` on every request, or the free tunnel returns an interstitial page instead of JSON. The server already answers the CORS preflight for GET and POST with that header.
+- Use one self-contained file (inline CSS and JS) or plain static files, with no build step and no server-side code.
+- The API the page may rely on: `GET /wallets`, `GET /api/events?after=N`, `POST /api/message` with `{text, session}`, and `GET /screen?address=0x...`. Reference implementation: `dashboard.html`. Do not call `/api/status`; it is not exposed because it shows the agent handle.
+
 ## How to know it works
 
 1. A scripted run with `handle_message` for a send to `akul.eth` produces the stages in order (`received`, `screening`, `awaiting_confirmation`) and, after YES, `paid` with a transaction hash.
