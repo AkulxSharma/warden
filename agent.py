@@ -107,7 +107,9 @@ RISK_TERMS = [(re.compile(p, re.I), ids) for p, ids in {
     r"7702|delegation": {"eip7702-delegation"},
     r"proxy|upgrad": {"eip1967-proxy", "admin-selectors"},
     r"\bmint|pause|blacklist|owner-only|admin-selectors": {"admin-selectors"},
-    r"unverified-source": {"unverified-source"},
+    r"unverified-source|source.?not.?scanned|not scanned|bytecode.?only|bytecode check": {
+        "unverified-source", "source-not-scanned"},
+    r"\beoa\b|externally owned|no contract code|not a contract": {"eoa"},
     r"sim-revert|sim-drains-sender": {"sim-revert", "sim-drains-sender"},
     r"honeypot|rug.?pull|backdoor|scam": set(),
 }.items()]

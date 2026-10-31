@@ -5,6 +5,7 @@ Run from the repo root:
 """
 import copy
 import json
+import re
 import sys
 import types
 import unittest
@@ -224,6 +225,37 @@ class ClaudeTests(unittest.TestCase):
         before = copy.deepcopy(scan)
         agent.explain(scan, down())
         self.assertEqual(scan, before)
+
+
+class RiskTermsCoverageTests(unittest.TestCase):
+    """Cross-checks agent.RISK_TERMS against the detector ids the scanners actually emit, so a
+    new id silently missing a keyword-map row (the exact bug this caught once before, when
+    Akul's bytecode-path ids first landed) fails CI instead of being found by hand."""
+
+    ID_LITERAL = re.compile(r'"id"\s*:\s*"([a-z0-9-]+)"|add\(\s*"([a-z0-9-]+)"')
+
+    def scanner_ids(self):
+        ids = set()
+        for name in ("warden_scan.py", "bytecode.py", "auditor.py"):
+            path = ROOT / name
+            if not path.exists():
+                continue
+            for m in self.ID_LITERAL.finditer(path.read_text(encoding="utf-8")):
+                ids.add(m.group(1) or m.group(2))
+        return ids
+
+    def covered_ids(self):
+        covered = set()
+        for _, needs in agent.RISK_TERMS:
+            covered |= needs
+        return covered
+
+    def test_every_real_detector_id_has_a_risk_terms_row(self):
+        real = self.scanner_ids()
+        self.assertTrue(real, "no detector ids found in the scanner source — check ID_LITERAL/file list")
+        missing = real - self.covered_ids()
+        self.assertFalse(missing, f"detector id(s) with no RISK_TERMS coverage: {sorted(missing)}. "
+                          "Add a row to agent.RISK_TERMS (see agent.py's module docstring).")
 
 
 class GuardTests(unittest.TestCase):
