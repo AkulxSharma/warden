@@ -8,7 +8,7 @@ Written 2026-10-30 (night), by the warden session. Read this before writing any 
 - **Submission deadline is unverified.** The "9 PM" deadline came from a relayed message, not from a sponsor page or the Night Hack site on disk. Confirm the real time and the submission form.
 - **Phantom sponsor: no spec on disk.** Nothing in the repo or memory describes Phantom's track, prize, or rules. Phantom is best known as a Solana wallet. Our scope is EVM only (no Solana). If the Phantom track requires Solana, the scope conflicts and Akul must decide. Do not guess at track rules.
 - **Other sponsors:** none documented on disk. Ask Akul for the full list before naming any.
-- **Prize rules that apply to us (from memory):** prize or grant money needs written ISS clearance first (Akul handles ISS himself). An SMS-only handle does not qualify for the prize, so the iMessage handle must be a real iMessage-capable line.
+- **Prize rules:** an SMS-only handle does not qualify for the Photon prize, so the iMessage handle must be a real iMessage-capable line.
 
 ## 1. Product (what Warden is)
 
