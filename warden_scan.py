@@ -86,7 +86,8 @@ def assigned_state_names(node, state_names):
 
 
 def scan(path, solc="solc"):
-    text = open(path, encoding="utf-8").read()
+    with open(path, encoding="utf-8") as fh:
+        text = fh.read()
     tree = load_ast(path, solc)
     nodes = list(walk(tree))
 
