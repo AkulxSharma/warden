@@ -194,7 +194,18 @@ def run(allowed, public, dry_run, poll, self_chat=False, agent_handle=""):
             if len(stamps) >= RATE_LIMIT:
                 continue  # public handle: ignore floods instead of replying to each
 
+            action, body = decide(text, chat_key, open_chats, time.time())
+            if action == "ignore":
+                continue  # Warden was not activated in this chat: stay silent
             print(f"[warden] <- {mask(handle)}: {text}")
+            if action in ("greet", "end"):
+                reply = REPLY_TAG + (GREETING if action == "greet" else GOODBYE)
+                if dry_run:
+                    print(f"[warden] -> (dry run)\n{reply}\n")
+                elif send(reply, chat_guid, handle):
+                    print(f"[warden] -> replied ({action})")
+                continue
+            text = body
             try:
                 out = handle_message(text, session=chat_key, channel="imessage", sender=mask(handle),
                                      can_transfer=normalize(handle) in allowed_norm)
