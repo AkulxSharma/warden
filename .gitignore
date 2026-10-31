@@ -3,3 +3,7 @@ node_modules/
 .env.*
 *.log
 .DS_Store
+.venv/
+fixtures/out*.json
+fixtures/err.log
+__pycache__/
