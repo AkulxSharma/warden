@@ -72,19 +72,69 @@ def main(src_dir, out_dir, api, handle=""):
     h = swap(h, 'await fetch("/api/events?after=" + after)', 'await fetch(API + "/api/events?after=" + after, {headers: NGROK})')
 
     # the screen form still works; the chat thread does not exist any more
-    new_chat = '''/* ---- screen ---- */
+    new_chat = r'''/* ---- screen: the chain animation follows the Auditor's real stages ---- */
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const STAGES = ["address", "bytecode", "source", "gate"];
+function scrambleOnly(k) {
+  clearInterval(scramble);
+  if (reduced) { field(k).textContent = "checking"; return; }
+  scramble = setInterval(() => { field(k).textContent = "0x" + hex(8); }, 70);
+}
+function chainStart() {
+  chain.dataset.state = "scanning"; delete chain.dataset.verdict;
+  blocks.forEach((b) => b.removeAttribute("data-s"));
+  links.forEach((l) => l.classList.remove("ok", "broken"));
+  chain.querySelectorAll("[data-k]").forEach((s) => (s.textContent = "waiting"));
+  scrambleOnly("address");
+}
+async function stageDone(ev) {
+  const i = STAGES.indexOf(ev.stage);
+  if (i < 0) return;
+  field(ev.stage).textContent = ev.detail;
+  blocks[i].dataset.s = ev.state;
+  if (i > 0) links[i - 1].classList.add("ok");
+  if (ev.stage === "gate" && ev.state === "high") { links[i - 1].classList.remove("ok"); links[i - 1].classList.add("broken"); }
+  if (i + 1 < STAGES.length) scrambleOnly(STAGES[i + 1]); else clearInterval(scramble);
+  if (!reduced) await sleep(380);   // each stage stays visible even when the check is quick
+}
+async function streamStages(text) {
+  const res = await fetch(API + "/api/screen-stream?q=" + encodeURIComponent(text), {headers: NGROK});
+  if (!res.ok || !res.body) throw new Error("no stream");
+  const reader = res.body.getReader(), dec = new TextDecoder();
+  let buf = "", result = null;
+  for (;;) {
+    const {value, done} = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, {stream: true});
+    let nl;
+    while ((nl = buf.indexOf("\n")) >= 0) {
+      const line = buf.slice(0, nl).trim();
+      buf = buf.slice(nl + 1);
+      if (!line) continue;
+      const ev = JSON.parse(line);
+      if (ev.error) throw new Error(ev.error);
+      if (ev.stage) await stageDone(ev);
+      if (ev.result) result = ev.result;
+    }
+  }
+  return result;
+}
+
 let busy = false;
 async function chat(text) {
   if (busy) return;
   busy = true; $("scanBtn").disabled = true;
-  chainScanning();
-  const started = performance.now();
+  chainStart();
   try {
-    const out = await send(text);
-    const wait = Math.max(0, 900 - (performance.now() - started)); // let the scan read as a scan
-    await new Promise((r) => setTimeout(r, reduced ? 0 : wait));
-    if (out.result) { chainDone(out.result); renderResult(out.result, out.reply, "from the web page (the web never sends money)", out.kind); }
-    else { chainIdle(); const r = $("result"); r.className = "panel result empty"; r.textContent = out.reply || "Send an address to screen."; }
+    // the stream drives the animation live; the message call supplies the reply text for the result panel
+    const [streamed, out] = await Promise.all([streamStages(text).catch(() => null), send(text)]);
+    if (out.result) {
+      if (streamed) { chain.dataset.verdict = streamed.verdict; chain.dataset.state = "done"; }
+      else chainDone(out.result);
+      renderResult(out.result, out.reply, "from the web page (the web never sends money)", out.kind);
+    } else {
+      chainIdle(); const r = $("result"); r.className = "panel result empty"; r.textContent = out.reply || "Send an address to screen.";
+    }
   } catch (e) {
     chainIdle(); const r = $("result"); r.className = "panel result empty"; r.textContent = "Could not reach the server. Try again.";
   } finally {

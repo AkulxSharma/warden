@@ -73,27 +73,50 @@ def _scan_source_text(text, solc):
         return _from_scan(warden_scan.scan(str(path), solc=solc))
 
 
-def screen(address, chain_id=DEFAULT_CHAIN_ID, calldata=None, value=None, solc="solc", api_key=None):
-    """Screen an address. Raises AuditorError if the check cannot run."""
+def _gate_text(result):
+    return f"{result['verdict']} {result['riskScore']}/100, " + ("refused" if result["verdict"] == "HIGH" else "allowed")
+
+
+def _worst_state(findings):
+    worst = max((SEVERITY_RANK[f["severity"]] for f in findings), default=0)
+    return {3: "high", 2: "medium"}.get(worst, "low")
+
+
+def screen(address, chain_id=DEFAULT_CHAIN_ID, calldata=None, value=None, solc="solc", api_key=None,
+           progress=None):
+    """Screen an address. Raises AuditorError if the check cannot run.
+
+    progress(stage, state, detail), if given, is called as each stage really finishes, in order:
+    address, bytecode, source, gate. state is low, medium, or high. It drives the live animation.
+    """
+    emit = progress or (lambda stage, state, detail: None)
     if not ADDRESS_RE.match(address or ""):
         raise AuditorError("invalid address")
     api_key = api_key or os.environ.get("ETHERSCAN_API_KEY")
+    emit("address", "low", f"{address[:6]}...{address[-4:]} on chain {chain_id}")
 
     try:
         code = chain.get_code(chain_id, address)
         if len(code) == 0 or bytecode.delegation_target(code):
-            return build_result(address, chain_id, bytecode.analyze_bytecode(code), False)
+            findings = bytecode.analyze_bytecode(code)
+            emit("bytecode", _worst_state(findings),
+                 "no contract code (EOA)" if len(code) == 0 else "EIP-7702 delegation")
+            emit("source", "low", "not applicable")
+            result = build_result(address, chain_id, findings, False)
+            emit("gate", result["verdict"].lower(), _gate_text(result))
+            return result
         slots = {name: chain.get_storage_at(chain_id, address, slot)
                  for name, slot in bytecode.PROXY_SLOTS.items()}
+        code_findings = bytecode.analyze_bytecode(code, slots)
+        emit("bytecode", _worst_state(code_findings), f"{len(code):,} bytes, {len(code_findings)} flag(s)")
         src = etherscan.get_source(chain_id, address, api_key) if api_key else None
     except (chain.ChainError, etherscan.EtherscanError) as exc:
         raise AuditorError(str(exc)) from exc
 
-    code_findings = bytecode.analyze_bytecode(code, slots)
-
     if src is None:
         extra = [{"id": "unverified-source", "severity": "medium",
                   "message": "source is not verified; bytecode checks only"}]
+        emit("source", "medium", "not verified, bytecode only")
     else:
         reason = "verified source has multiple files" if src["kind"] == "multi" else None
         if src["kind"] == "single":
@@ -104,11 +127,17 @@ def screen(address, chain_id=DEFAULT_CHAIN_ID, calldata=None, value=None, solc="
             else:
                 # admin powers and upgradeability exist whether or not the source is verified
                 kept = [f for f in code_findings if f["id"] in ("eip1967-proxy", "admin-selectors")]
-                return build_result(address, chain_id, found + kept, True)
+                emit("source", _worst_state(found), f"verified, {len(found)} finding(s)")
+                result = build_result(address, chain_id, found + kept, True)
+                emit("gate", result["verdict"].lower(), _gate_text(result))
+                return result
         extra = [{"id": "source-not-scanned", "severity": "medium",
                   "message": f"{reason}; bytecode checks only"}]
+        emit("source", "medium", "verified, not scanned here")
 
-    return build_result(address, chain_id, code_findings + extra, False)
+    result = build_result(address, chain_id, code_findings + extra, False)
+    emit("gate", result["verdict"].lower(), _gate_text(result))
+    return result
 
 
 def main(argv):

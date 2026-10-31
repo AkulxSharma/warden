@@ -114,6 +114,38 @@ class ScreenTests(unittest.TestCase):
                 auditor.screen(ADDR, api_key="k")
 
 
+class ProgressTests(unittest.TestCase):
+    def collect(self, code, source=None):
+        events = []
+        with mock.patch.object(chain, "get_code", return_value=code), \
+                mock.patch.object(chain, "get_storage_at", return_value=ZERO32), \
+                mock.patch.object(etherscan, "get_source", return_value=source):
+            result = auditor.screen(ADDR, api_key="k", progress=lambda s, st, d: events.append((s, st, d)))
+        return events, result
+
+    def test_stages_arrive_in_order_for_a_contract(self):
+        events, result = self.collect(bytes([0x00, 0xFF]))
+        self.assertEqual([e[0] for e in events], ["address", "bytecode", "source", "gate"])
+        self.assertEqual(events[1][1], "high")            # SELFDESTRUCT found
+        self.assertIn("not verified", events[2][2])
+        self.assertEqual(events[3][1], result["verdict"].lower())
+        self.assertIn("refused", events[3][2])
+
+    def test_eoa_reports_all_four_stages(self):
+        events, result = self.collect(b"")
+        self.assertEqual([e[0] for e in events], ["address", "bytecode", "source", "gate"])
+        self.assertIn("EOA", events[1][2])
+        self.assertIn("allowed", events[3][2])
+
+    def test_bytecode_is_reported_before_the_source_lookup(self):
+        order = []
+        with mock.patch.object(chain, "get_code", return_value=bytes([0x00])), \
+                mock.patch.object(chain, "get_storage_at", return_value=ZERO32), \
+                mock.patch.object(etherscan, "get_source", side_effect=lambda *a, **k: order.append("fetch") or None):
+            auditor.screen(ADDR, api_key="k", progress=lambda s, st, d: order.append(s))
+        self.assertLess(order.index("bytecode"), order.index("fetch"))
+
+
 class ClassifyTests(unittest.TestCase):
     def test_single_file(self):
         self.assertEqual(etherscan.classify("contract A {}")[0], "single")

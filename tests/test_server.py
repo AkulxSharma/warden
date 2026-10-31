@@ -92,5 +92,19 @@ class HandleTests(unittest.TestCase):
         self.assertEqual(status, 500)
 
 
+class AddressFromTextTests(unittest.TestCase):
+    def test_plain_address_and_link(self):
+        self.assertEqual(server.address_from_text(f"screen {ADDR} please"), ADDR)
+        self.assertEqual(server.address_from_text(f"https://sepolia.etherscan.io/address/{ADDR}"), ADDR)
+
+    def test_known_alias_name(self):
+        import aliases
+        self.assertEqual(server.address_from_text("check vault.eth"), aliases.resolve("vault.eth"))
+
+    def test_nothing_found(self):
+        self.assertIsNone(server.address_from_text("hello there"))
+        self.assertIsNone(server.address_from_text("unknown-name.eth"))
+
+
 if __name__ == "__main__":
     unittest.main()

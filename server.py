@@ -12,6 +12,7 @@ few seconds to protect the Etherscan key and the RPC. Failures are never cached.
 """
 import json
 import os
+import re
 import sys
 import threading
 import time
@@ -44,6 +45,26 @@ RATE_LIMIT = 60     # /screen requests per client per minute
 _cache = {}         # (address, chain_id) -> (expires_at, result)
 _hits = {}          # client -> request timestamps in the last minute
 _lock = threading.Lock()
+
+
+ADDRESS_FIND = re.compile(r"0x[0-9a-fA-F]{40}")
+
+
+def address_from_text(text):
+    """The address in a text: a 0x address, an explorer link containing one, or a known alias name."""
+    found = ADDRESS_FIND.search(text or "")
+    if found:
+        return found.group(0)
+    try:
+        import aliases
+    except ImportError:
+        return None
+    for name in aliases.NAME.findall(text or ""):
+        resolved = aliases.resolve(name)
+        if resolved:
+            return resolved
+    return None
+
 
 
 def reset():
@@ -160,7 +181,39 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def _stream_screen(self):
+        """Live screening: one JSON line per stage as the Auditor really finishes it, then the result."""
+        forwarded = self.headers.get("X-Forwarded-For", "").split(",")[0].strip() or self.client_address[0]
+        text = (parse_qs(urlparse(self.path).query).get("q") or [""])[0][:500]
+        self.send_response(200)
+        self.send_header("Content-Type", "application/x-ndjson")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Accel-Buffering", "no")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+
+        def write(obj):
+            self.wfile.write((json.dumps(obj) + "\n").encode())
+            self.wfile.flush()
+
+        try:
+            address = address_from_text(text)
+            if not address:
+                return write({"error": "no address found"})
+            if _rate_limited("stream:" + forwarded, time.time()):
+                return write({"error": "rate limited, retry in a minute"})
+            result = auditor.screen(address, auditor.DEFAULT_CHAIN_ID,
+                                    progress=lambda stage, state, detail:
+                                    write({"stage": stage, "state": state, "detail": detail}))
+            write({"done": True, "result": result})
+        except auditor.AuditorError as exc:
+            write({"error": str(exc)})
+        except (BrokenPipeError, ConnectionResetError):
+            pass  # the visitor closed the page mid-scan
+
     def do_GET(self):
+        if urlparse(self.path).path == "/api/screen-stream":
+            return self._stream_screen()
         if urlparse(self.path).path == "/api/events":
             # live feed for the progress tracker; /api/status is deliberately NOT proxied (it shows the agent handle)
             query = urlparse(self.path).query
