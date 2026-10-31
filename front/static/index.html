@@ -194,17 +194,7 @@
       <div class="thread" id="thread">
         <div class="bubble in">Text “send 0.001 to akul.eth” and I'll check the address before anything moves. HIGH risk gets refused. Or send just an address to screen it.</div>
       </div>
-      <div class="suggest" id="suggest">
-        <button>send 0.001 to drainer.eth</button>
-        <button>send 0.001 to akul.eth</button>
-        <button>0x2222222222222222222222222222222222222222</button>
-        <button>what does delegatecall mean?</button>
-      </div>
-      <form id="chatForm">
-        <input id="chatInput" placeholder="iMessage" autocomplete="off" spellcheck="false" aria-label="Message">
-        <button aria-label="Send">↑</button>
-      </form>
-      <div class="note">The web chat screens only. Money moves only from the team's test phones.</div>
+      <div class="note">Text the Warden iMessage line to try it. This page shows what happens live.</div>
     </div>
   </aside>
 </main>
@@ -409,28 +399,6 @@ function bubble(text, dir) {
   $("thread").append(b);
   $("thread").scrollTop = $("thread").scrollHeight;
 }
-async function chat(text) {
-  bubble(text, "out");
-  const typing = el("div", "typing", "Warden is checking…");
-  $("thread").append(typing);
-  $("thread").scrollTop = $("thread").scrollHeight;
-  try {
-    const r = await api("/api/message", {method: "POST", headers: {"Content-Type": "application/json"},
-                                         body: JSON.stringify({text, session})});
-    const out = await r.json();
-    bubble(out.reply || "Something went wrong. Try again.", "in");
-  } catch (e) {
-    bubble("Warden is unreachable right now. Try again in a moment.", "in");
-  }
-  typing.remove();
-}
-$("chatForm").addEventListener("submit", (e) => {
-  e.preventDefault();
-  const text = $("chatInput").value.trim();
-  if (text) { $("chatInput").value = ""; chat(text); }
-});
-$("suggest").addEventListener("click", (e) => { if (e.target.tagName === "BUTTON") chat(e.target.textContent); });
-
 idle();
 poll();
 loadWallets(false);

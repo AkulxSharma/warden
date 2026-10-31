@@ -160,15 +160,21 @@ def connect():
                  "System Settings > Privacy & Security > Full Disk Access, then restart that app.")
 
 
-def send(text, chat_guid, handle):
-    for script, target in ((SEND_TO_CHAT, chat_guid), (SEND_TO_HANDLE, handle)):
-        if not target:
-            continue
-        out = subprocess.run(["osascript", "-e", script, text, target], capture_output=True, text=True)
-        if out.returncode == 0:
-            return True
-        print(f"[warden] send via {'chat' if script is SEND_TO_CHAT else 'handle'} failed: "
-              f"{out.stderr.strip()}", file=sys.stderr)
+def send(text, chat_guid, handle, attempts=3):
+    """Send text, trying the chat then the handle, and retry so a busy or closed Messages app
+    does not drop a reply."""
+    for attempt in range(attempts):
+        for script, target in ((SEND_TO_CHAT, chat_guid), (SEND_TO_HANDLE, handle)):
+            if not target:
+                continue
+            out = subprocess.run(["osascript", "-e", script, text, target], capture_output=True, text=True)
+            if out.returncode == 0:
+                return True
+            print(f"[warden] send via {'chat' if script is SEND_TO_CHAT else 'handle'} failed: "
+                  f"{out.stderr.strip()}", file=sys.stderr)
+        if attempt < attempts - 1:
+            subprocess.run(["open", "-g", "-a", "Messages"], capture_output=True)  # make sure Messages is running
+            time.sleep(1 + attempt)
     return False
 
 
@@ -190,7 +196,16 @@ def run(allowed, public, dry_run, poll, self_chat=False, agent_handle=""):
     allowed_norm = {normalize(h) for h in allowed}
     seen, recent, per_sender, open_chats = set(), {}, {}, {}
     while True:
-        rows = db.execute(NEW_MESSAGES, (last,)).fetchall()
+        try:
+            rows = db.execute(NEW_MESSAGES, (last,)).fetchall()
+        except sqlite3.Error as exc:  # Messages briefly locks chat.db: wait, reconnect, never die
+            print(f"[warden] chat.db read failed ({exc}); retrying", file=sys.stderr)
+            time.sleep(max(poll, 1.0))
+            try:
+                db = connect()
+            except SystemExit:
+                pass
+            continue
         for rowid, text, body, from_me, handle, chat_guid, style in rows:
             last = max(last, rowid)
             if rowid in seen:
@@ -225,6 +240,8 @@ def run(allowed, public, dry_run, poll, self_chat=False, agent_handle=""):
                     print(f"[warden] -> (dry run)\n{reply}\n")
                 elif send(reply, chat_guid, handle):
                     print(f"[warden] -> replied ({action})")
+                else:
+                    print(f"[warden] reply to {mask(handle)} could not be sent ({action})", file=sys.stderr)
                 continue
             text = body
             try:
@@ -238,6 +255,8 @@ def run(allowed, public, dry_run, poll, self_chat=False, agent_handle=""):
                 print(f"[warden] -> (dry run)\n{reply}\n")
             elif send(reply, chat_guid, handle):
                 print(f"[warden] -> replied ({out['kind']})")
+            else:
+                print(f"[warden] reply to {mask(handle)} could not be sent ({out['kind']})", file=sys.stderr)
         time.sleep(poll)
 
 
