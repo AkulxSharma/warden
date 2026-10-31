@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "warden/auditor-output.schema.json",
+  "title": "Warden Auditor output",
+  "description": "Fixed contract between the Auditor, the Agent, and the iMessage + UI workstreams. Do not rename fields without telling every workstream. A LOW verdict means no flagged risk, never 'safe'.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["target", "chainId", "verdict", "riskScore", "verified", "findings"],
+  "properties": {
+    "target": {
+      "type": "string",
+      "pattern": "^0x[0-9a-fA-F]{40}$",
+      "description": "EVM address that was screened."
+    },
+    "chainId": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "EVM chain id. Sepolia is 11155111. Testnet only until Akul says otherwise."
+    },
+    "verdict": {
+      "type": "string",
+      "enum": ["LOW", "MEDIUM", "HIGH"],
+      "description": "Worst finding severity. No findings = LOW. There is no 'SAFE' or 'CLEAN' value."
+    },
+    "riskScore": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Provisional: 50 per high, 15 per medium, 5 per low finding, capped at 100."
+    },
+    "verified": {
+      "type": "boolean",
+      "description": "true = verified source was fetched and scanned. false = bytecode-only checks."
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "severity", "message"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Detector id, e.g. reentrancy-state-after-call, tx-origin, eip7702-delegation."
+          },
+          "severity": { "type": "string", "enum": ["high", "medium", "low"] },
+          "message": { "type": "string", "description": "Plain statement of what was found." }
+        }
+      }
+    }
+  }
+}

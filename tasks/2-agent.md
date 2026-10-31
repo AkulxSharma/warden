@@ -1,14 +1,29 @@
-# Task 2 of 3: AGENT (plain-English explanation)
+# Task 2 of 3: AGENT (the transfer agent and the plain-English voice)
 
-Owner: not yet assigned. Send this file to whichever session takes it. Read the shared brief too: `sessions/warden/BRIEF-workstreams.md`.
+Owner: not yet assigned. Send this file to whichever session takes it. Read `PRODUCT-DEV-DOC.md` first. Last updated 2026-10-30 about 19:10 PDT. Submissions are due at 9:00 PM.
 
-## What it is
+## What you are building
 
-The Agent takes the Auditor's JSON output and writes the plain-English reply that the user sees. It also answers follow-up questions about the same scan. It uses Claude to write the text.
+The Agent is the brain between iMessage and the chain. A user texts "send 0.01 to 0xabc...". You parse the request, ask the Auditor whether the target is risky, and either refuse or send a Sepolia test-ETH transfer. Then you text back what happened. This is the Pyra idea (a firewall between the ask and the transaction) rebuilt from scratch. Do not copy Pyra's code.
 
-## Input
+All money is Sepolia test ether. Nothing real is spent.
 
-The Auditor output, exactly as defined below. You do not call the Auditor directly in your own code path except through the interface Akul provides. Until the Auditor lands, use fixture JSON.
+## The flow
+
+1. Receive a message from the iMessage workstream (sender handle plus text).
+2. Check the sender against an allowlist of the team's own handles. Ignore everyone else silently.
+3. Work out the intent: a transfer request (address plus amount), a screen-only request (just an address), a confirmation ("YES"), or a follow-up question about the last result.
+4. For a transfer or screen request, call the Auditor: `GET <base-url>/screen?address=0x...&chainId=11155111`. Until the base URL exists, use the fixtures in `fixtures/auditor-output/` (`low.json`, `medium.json`, `high.json`).
+5. Apply the gate in code, not in a prompt:
+   - verdict HIGH: refuse and explain.
+   - Auditor error, timeout, non-200, or JSON that fails `schema/auditor-output.schema.json`: refuse and say the check could not run.
+   - verdict LOW or MEDIUM: show the result and ask "Reply YES to send." Send only after a YES from the same sender for the same pending request.
+6. Send the transfer on Sepolia from a throwaway test wallet. The private key lives in `.env` only and is never committed, logged, or sent in a message. A small per-transfer cap (about 0.01 ETH) is recommended.
+7. Text back the result: sent (with `https://sepolia.etherscan.io/tx/<hash>`), refused (with reasons), or failed.
+
+The language model never decides whether to send. The gate is plain code.
+
+## Auditor JSON you will receive
 
 ```json
 {
@@ -17,54 +32,31 @@ The Auditor output, exactly as defined below. You do not call the Auditor direct
   "verdict": "LOW | MEDIUM | HIGH",
   "riskScore": 0,
   "verified": true,
-  "findings": [
-    { "id": "reentrancy", "severity": "high", "message": "..." }
-  ]
+  "findings": [{ "id": "tx-origin", "severity": "medium", "message": "..." }]
 }
 ```
 
-## Output
+## Wording rules (you own the prompt and the disclaimer)
 
-A short iMessage-sized reply (a few short bullets, not an essay) containing:
-- the verdict as `risk signal: LOW | MEDIUM | HIGH`,
-- the `riskScore` (0-100),
-- plain-English reasons, one per finding,
-- the disclaimer.
-
-Follow-up questions ("what does reentrancy mean?", "is this token a scam?") get a direct answer, but only from the JSON in this scan.
-
-## Hard rules
-
-1. **Never invent findings.** Every reason in the reply must map to an entry in `findings`. If the user asks about a risk that is not in the JSON, say the scan did not flag it. Do not claim it is absent.
-2. **Never say "safe."** Not in the reply, not in a follow-up.
-3. **Always include the disclaimer:** this is a risk signal, not a guarantee, and it is not a full audit.
-4. **Honest limits:** say when a contract is unverified and the scan used bytecode checks only.
-5. Do not change field names in the JSON.
-
-## What you own
-
-- The prompt that drives the Claude call.
-- The wording and tone of the reply.
-- The disclaimer text.
-- The follow-up handling (a single scan's context, nothing else).
+- Never invent findings. Every reason must map to an entry in `findings`. If asked about something not in the JSON, say the scan did not flag it; do not claim it is absent.
+- Never say "safe." Say it is a risk signal, not a guarantee, and not a full audit.
+- If `verified` is false, say the check used bytecode only and is less complete.
+- Replies are short, iMessage-sized, a few bullets. Lead with the verdict and score.
+- A follow-up question is answered only from the JSON of the scan being discussed.
 
 ## Build order
 
-1. Write the prompt and the reply format against the fixture JSON.
-2. Create at least three fixtures: a LOW result, a MEDIUM result with a verified contract, and a HIGH result for an unverified address with a delegation finding.
-3. Test that the reply uses only findings present in each fixture. Add a check that fails if the reply mentions a finding id that is absent from the JSON.
-4. Test follow-up questions against the same fixtures.
-5. Swap the fixture for the real Auditor output when workstream 1 lands. Do not change the prompt to make the real output fit.
+1. Intent parser plus allowlist plus pending-request state (one pending request per sender).
+2. The gate function, with unit tests: HIGH refuses, Auditor error refuses, timeout refuses, bad JSON refuses, LOW or MEDIUM asks for YES, YES sends, no YES means no send.
+3. Wording prompt, tested against the three fixtures, with a check that fails if a reply mentions a finding id absent from the JSON.
+4. Sepolia sender (viem, ethers, or web3.py) with the throwaway wallet, tested on Sepolia with a small amount.
+5. Swap the fixtures for the live Auditor URL when Akul announces it. Do not change the prompt to fit the live output.
 
 ## Rules
 
-- No keys in the repo. `.env` is gitignored.
+- No keys in the repo. `.env` is gitignored. Never paste a key into chat or a commit.
 - Sepolia testnet only.
 - No outward posts. No public GitHub push without Akul's yes.
-- Every commit ends with `Co-Authored-By: Claude Haiku 5.5 <noreply@anthropic.com>`.
-- Report to the Conductor session (`claude-code-81`) on done, blocker, or needs-Akul.
-
-## Blockers
-
-- Night Hack status and the submission deadline are unconfirmed. Ask Akul before any deadline-driven choice.
-- Phantom track rules are not on disk. Do not assume Solana support is needed or not needed.
+- Every commit ends with the Co-Authored-By line from the session's current attribution reminder.
+- Report to the Conductor session on done, blocker, or needs-Akul.
+- Disclose in the submission that the Pyra idea existed before the event; no Pyra code is reused.
