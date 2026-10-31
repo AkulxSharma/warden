@@ -1,0 +1,19 @@
+{
+  "target": "0x3333333333333333333333333333333333333333",
+  "chainId": 11155111,
+  "verdict": "HIGH",
+  "riskScore": 100,
+  "verified": false,
+  "findings": [
+    {
+      "id": "eip7702-delegation",
+      "severity": "high",
+      "message": "address is an EOA delegated by EIP-7702 (code starts with 0xef0100); its behavior is set by another contract"
+    },
+    {
+      "id": "delegatecall-opcode",
+      "severity": "high",
+      "message": "bytecode contains a DELEGATECALL opcode and the source is not verified"
+    }
+  ]
+}
