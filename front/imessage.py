@@ -24,11 +24,14 @@ Usage:
 """
 import argparse
 import os
+import re
 import sqlite3
 import subprocess
 import sys
 import time
 from pathlib import Path
+
+import aliases
 
 from . import config
 from .parse import parse
@@ -48,6 +51,56 @@ ORDER BY m.ROWID
 """
 GROUP_CHAT_STYLE = 43
 RATE_LIMIT = 10   # replies per sender per minute
+
+# Warden stays silent in a chat until someone texts "Hey Warden", and goes silent again on "End Warden".
+ACTIVATION = re.compile(r"^\s*hey[\s,!.]+warden\b[\s,.!:;-]*", re.I)
+END = re.compile(r"^\s*(end|stop|bye)\s+warden\b", re.I)
+CHAT_IDLE_SECONDS = 1800   # a chat that has been quiet this long needs "Hey Warden" again
+GOODBYE = "Warden session ended. Text \"Hey Warden\" to start again."
+
+# One-line description of each predefined demo name, shown in the first reply.
+ROLES = {
+    "akul.eth": "a normal receiving address",
+    "andrew.eth": "the agent's own wallet",
+    "drainer.eth": "a contract that can self-destruct",
+    "vault.eth": "a verified vault with several bugs",
+    "rugpull.eth": "a token whose owner can mint and blacklist",
+    "proxy.eth": "an upgradeable proxy",
+    "phisher.eth": "a wallet that trusts tx.origin",
+}
+
+
+def greeting():
+    """First reply after "Hey Warden": what Warden does and every predefined name to try."""
+    names = "\n".join(f"- {name}: {ROLES[name]}" if name in ROLES else f"- {name}" for name in aliases.ALIASES)
+    return ("Warden here. I check an address before you pay it.\n\n"
+            f"Predefined wallets you can try:\n{names}\n\n"
+            "Text e.g. \"send 0.001 to akul.eth\", or paste any 0x address to screen it. "
+            "Text \"End Warden\" when you're done.\n"
+            "Sepolia testnet only. Risk signal, not a guarantee.")
+
+
+def decide(text, chat_key, open_chats, now):
+    """What to do with a text given the chats Warden is active in.
+
+    Returns (action, body): ("ignore", None) stay silent, ("greet", None) Warden was just activated,
+    ("end", None) the user ended the session, ("handle", text) pass text to the pipeline.
+    Mutates open_chats (chat key -> time of last activity).
+    """
+    last = open_chats.get(chat_key)
+    active = last is not None and now - last <= CHAT_IDLE_SECONDS
+    if END.match(text):
+        open_chats.pop(chat_key, None)
+        return ("end", None) if active else ("ignore", None)
+    match = ACTIVATION.match(text)
+    if match:
+        open_chats[chat_key] = now
+        rest = text[match.end():].strip()
+        return ("handle", rest) if rest else ("greet", None)
+    if active:
+        open_chats[chat_key] = now
+        return ("handle", text)
+    return ("ignore", None)
 
 SEND_TO_CHAT = """
 on run argv
@@ -129,13 +182,13 @@ def run(allowed, public, dry_run, poll, self_chat=False, agent_handle=""):
     last = db.execute("SELECT IFNULL(MAX(ROWID), 0) FROM message").fetchone()[0]
     who = ", ".join(mask(h) for h in allowed) or "no testers"
     if public:
-        who += " + anyone texting an address, link or 'warden'"
+        who += " + anyone, but only in chats that started with 'Hey Warden'"
     print(f"[warden] agent handle {mask(agent_handle) if agent_handle else '(WARDEN_AGENT_HANDLE not set)'}")
     print(f"[warden] answering {who}"
           f"{' (dry run)' if dry_run else ''}. Ctrl+C to stop.")
 
     allowed_norm = {normalize(h) for h in allowed}
-    seen, recent, per_sender, open_chats = set(), {}, {}, set()
+    seen, recent, per_sender, open_chats = set(), {}, {}, {}
     while True:
         rows = db.execute(NEW_MESSAGES, (last,)).fetchall()
         for rowid, text, body, from_me, handle, chat_guid, style in rows:
@@ -151,12 +204,8 @@ def run(allowed, public, dry_run, poll, self_chat=False, agent_handle=""):
             if style == GROUP_CHAT_STYLE:
                 continue
             chat_key = chat_guid or handle
-            if normalize(handle) not in allowed_norm:
-                if not public:
-                    continue
-                if chat_key not in open_chats and not wants_warden(text):
-                    continue  # a normal text to the owner's number, not for Warden
-            open_chats.add(chat_key)
+            if normalize(handle) not in allowed_norm and not public:
+                continue
             key = (chat_guid or handle, text)
             if time.time() - recent.get(key, 0) < 15:
                 continue  # self-chat can store one text as two rows
@@ -166,7 +215,18 @@ def run(allowed, public, dry_run, poll, self_chat=False, agent_handle=""):
             if len(stamps) >= RATE_LIMIT:
                 continue  # public handle: ignore floods instead of replying to each
 
+            action, body = decide(text, chat_key, open_chats, time.time())
+            if action == "ignore":
+                continue  # Warden was not activated in this chat: stay silent
             print(f"[warden] <- {mask(handle)}: {text}")
+            if action in ("greet", "end"):
+                reply = REPLY_TAG + (greeting() if action == "greet" else GOODBYE)
+                if dry_run:
+                    print(f"[warden] -> (dry run)\n{reply}\n")
+                elif send(reply, chat_guid, handle):
+                    print(f"[warden] -> replied ({action})")
+                continue
+            text = body
             try:
                 out = handle_message(text, session=chat_key, channel="imessage", sender=mask(handle),
                                      can_transfer=normalize(handle) in allowed_norm)
