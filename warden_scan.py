@@ -129,6 +129,9 @@ def scan(path, solc="solc"):
                 continue
             ext_name, receiver = external_call_name(n)
             if ext_name in ("call", "send", "transfer") and receiver is not None:
+                # unwrap payable(x) / address(x) conversions
+                if receiver.get("nodeType") == "FunctionCall" and len(receiver.get("arguments", [])) == 1:
+                    receiver = receiver["arguments"][0]
                 if receiver.get("nodeType") == "Identifier" and receiver.get("name") in params and not has_sender_check:
                     add("arbitrary-send", "HIGH",
                         f"sends ETH to parameter '{receiver['name']}' with no msg.sender check",
