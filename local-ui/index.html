@@ -1,0 +1,412 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Warden</title>
+<style>
+  /* Local draft. Native CSS + vanilla JS, no dependencies. One accent (cobalt); verdict colors carry state only.
+     Shape rule: panels 16px, controls 10px, chips and the phone input are pills. */
+  :root {
+    --bg: #f4f4f1; --panel: #ffffff; --ink: #14171c; --muted: #5d636e; --line: #e1e2dd;
+    --accent: #2f5fd8; --on-accent: #ffffff;
+    --low: #1c7a44; --med: #7d5608; --high: #b42318;
+    --low-bg: #e3f2e9; --med-bg: #f8eed6; --high-bg: #fae3e0;
+    --bubble-in: #e8e8e6; --bubble-in-ink: #14171c; --bubble-out: #0a6bdc;
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0d0f12; --panel: #15181d; --ink: #e9eaed; --muted: #9aa1ab; --line: #272b33;
+      --accent: #7ea2ff; --on-accent: #0d0f12;
+      --low: #4cc27e; --med: #e0a84a; --high: #f28b82;
+      --low-bg: #12281c; --med-bg: #2b2212; --high-bg: #301615;
+      --bubble-in: #252830; --bubble-in-ink: #e9eaed;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 16px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif; }
+  code, .mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+
+  header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 16px 24px; border-bottom: 1px solid var(--line); }
+  header h1 { font-size: 20px; margin: 0; letter-spacing: -0.02em; }
+  .badge { font-size: 13px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+  .badge.mock { border-color: var(--med); color: var(--med); }
+  .badge.net { margin-left: auto; }
+
+  main { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 20px; padding: 24px; max-width: 1200px; margin: 0 auto; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; padding: 16px; } }
+  .left { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 22px; }
+  .panel h2.label { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0 0 12px; font-weight: 600; }
+
+  /* Hero */
+  .hero h2 { font-size: clamp(26px, 4.2vw, 38px); line-height: 1.1; letter-spacing: -0.03em; margin: 0 0 8px; font-weight: 650; }
+  .hero p { margin: 0 0 20px; color: var(--muted); max-width: 52ch; }
+  form { display: flex; gap: 8px; }
+  input { flex: 1; min-width: 0; font: inherit; padding: 11px 14px; border-radius: 10px; border: 1px solid var(--line);
+          background: var(--bg); color: var(--ink); }
+  input::placeholder { color: var(--muted); }
+  input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  button { font: inherit; font-weight: 600; padding: 11px 18px; border-radius: 10px; border: 0; background: var(--accent);
+           color: var(--on-accent); cursor: pointer; transition: transform .18s var(--ease), opacity .18s; }
+  button:active { transform: translateY(1px) scale(0.98); }
+  button:disabled { opacity: .6; cursor: progress; }
+  .demos { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; font-size: 14px; color: var(--muted); align-items: center; }
+  .demos button { background: transparent; color: var(--ink); border: 1px solid var(--line); padding: 5px 12px; font-weight: 500; font-size: 14px; }
+  .demos button:hover { border-color: var(--accent); }
+
+  /* The chain: address -> bytecode -> source -> gate. It shows what a screen walks through. */
+  .chain { display: flex; align-items: stretch; margin: 0 0 22px; padding: 4px 0 8px; overflow-x: auto; scrollbar-width: none; }
+  .chain::-webkit-scrollbar { display: none; }
+  .blk { flex: 0 0 auto; min-width: 104px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg);
+         transition: border-color .4s var(--ease), background-color .4s var(--ease); }
+  .blk b { display: block; font-size: 13px; font-weight: 600; }
+  .blk span { display: block; font: 12px ui-monospace, "SF Mono", Menlo, monospace; color: var(--muted); min-height: 18px; white-space: nowrap; }
+  .blk[data-s="low"] { border-color: var(--low); }
+  .blk[data-s="medium"] { border-color: var(--med); background: var(--med-bg); }
+  .blk[data-s="high"] { border-color: var(--high); background: var(--high-bg); }
+  .link { flex: 1 1 24px; min-width: 20px; display: flex; justify-content: space-between; align-self: center; position: relative; overflow: hidden; height: 2px; }
+  .link i { flex: 1 1 0; height: 2px; background: var(--line); transition: flex-grow .6s var(--ease), background-color .4s; }
+  .link.ok i { background: var(--low); }
+  .link.broken i { flex-grow: .3; background: var(--high); }
+  .link.broken { overflow: visible; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    /* Idle: a pulse travels block to block, twice, then rests. Motion meaning: the check walks the chain. */
+    .link::after { content: ""; position: absolute; top: 0; left: 0; width: 36%; height: 2px; background: var(--accent);
+                   transform: translateX(-120%); animation: walk 3.6s var(--ease) 2; animation-delay: calc(var(--i) * 1.1s); opacity: .8; }
+    @keyframes walk { 0% { transform: translateX(-120%); } 35%, 100% { transform: translateX(330%); } }
+    /* Scanning: blocks light in sequence while their label lines scramble (feedback for a call in flight). */
+    .chain[data-state="scanning"] .blk { animation: lit 1.4s var(--ease) infinite; animation-delay: calc(var(--i) * .22s); }
+    @keyframes lit { 0%, 100% { border-color: var(--line); } 30% { border-color: var(--accent); background-color: var(--panel); } }
+    .chain[data-state="scanning"] .link::after { animation-iteration-count: infinite; animation-duration: 1.2s; animation-delay: calc(var(--i) * .22s); }
+    .chain[data-state="done"] .link::after { animation: none; opacity: 0; }
+    /* A refusal: the last link opens and the gate block recoils once. */
+    .chain[data-verdict="HIGH"] .blk.gate { animation: recoil .5s var(--ease) 1; }
+    @keyframes recoil { 0% { transform: translateX(0); } 30% { transform: translateX(8px); } 100% { transform: translateX(0); } }
+    .rise { animation: rise .55s var(--ease) both; animation-delay: calc(var(--i, 0) * 70ms); }
+    @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+    .dots i { animation: blink 1.2s infinite; }
+    .dots i:nth-child(2) { animation-delay: .2s; } .dots i:nth-child(3) { animation-delay: .4s; }
+    @keyframes blink { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
+    .feed .item.fresh { animation: flash 1.6s var(--ease); }
+    @keyframes flash { from { box-shadow: 0 0 0 2px var(--accent); } to { box-shadow: 0 0 0 0 transparent; } }
+  }
+
+  /* Result */
+  .result.empty { color: var(--muted); }
+  .verdict-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .verdict { font-weight: 700; font-size: 22px; padding: 6px 14px; border-radius: 10px; }
+  .verdict.LOW { color: var(--low); background: var(--low-bg); }
+  .verdict.MEDIUM { color: var(--med); background: var(--med-bg); }
+  .verdict.HIGH { color: var(--high); background: var(--high-bg); }
+  .score { flex: 1; min-width: 160px; }
+  .score .num { font-variant-numeric: tabular-nums; font-weight: 650; font-size: 22px; }
+  .bar { height: 8px; border-radius: 99px; background: var(--line); margin-top: 6px; overflow: hidden; }
+  .bar span { display: block; height: 100%; width: 0; border-radius: 99px; transition: width .9s var(--ease); }
+  .meta { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0 6px; font-size: 13px; }
+  .meta .chip { padding: 3px 10px; border-radius: 999px; background: var(--bg); border: 1px solid var(--line); }
+  .meta .unverified { color: var(--med); border-color: var(--med); }
+  .meta .verified { color: var(--low); border-color: var(--low); }
+  code { font-size: 13px; word-break: break-all; }
+  ul.findings { list-style: none; padding: 0; margin: 14px 0; display: flex; flex-direction: column; gap: 8px; }
+  ul.findings li { padding: 11px 14px; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); }
+  ul.findings li.high { border-color: var(--high); }
+  ul.findings li.medium { border-color: var(--med); }
+  ul.findings .fid { font-size: 13px; color: var(--muted); }
+  .gate-line { display: inline-block; font-weight: 700; font-size: 14px; padding: 4px 10px; border-radius: 8px; margin-bottom: 12px; }
+  .gate-line.high { color: var(--high); background: var(--high-bg); }
+  .gate-line.medium { color: var(--med); background: var(--med-bg); }
+  .gate-line.low { color: var(--muted); background: var(--bg); }
+  .disclaimer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 12px; margin-top: 14px; }
+  .source { font-size: 13px; color: var(--muted); margin-top: 8px; }
+
+  /* Phone */
+  .phone { border-radius: 28px; border: 1px solid var(--line); background: var(--panel); display: flex; flex-direction: column; height: 640px; overflow: hidden; }
+  .phone .top { text-align: center; padding: 14px 10px 10px; border-bottom: 1px solid var(--line); }
+  .phone .avatar { width: 40px; height: 40px; border-radius: 50%; margin: 0 auto 4px; background: var(--accent); color: var(--on-accent);
+                   display: grid; place-items: center; font-weight: 700; }
+  .phone .name { font-size: 14px; font-weight: 600; }
+  .phone .sub { font-size: 13px; color: var(--muted); }
+  .thread { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+  .bubble { max-width: 82%; padding: 8px 12px; border-radius: 18px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 15px; }
+  .bubble.in { align-self: flex-start; background: var(--bubble-in); color: var(--bubble-in-ink); border-bottom-left-radius: 6px; }
+  .bubble.out { align-self: flex-end; background: var(--bubble-out); color: #fff; border-bottom-right-radius: 6px; }
+  .typing { align-self: flex-start; color: var(--muted); font-size: 14px; padding: 4px 8px; }
+  .dots i { font-style: normal; }
+  .phone form { padding: 10px; border-top: 1px solid var(--line); }
+  .phone input { border-radius: 999px; }
+  .phone button { border-radius: 999px; padding: 8px 16px; }
+
+  /* Feed */
+  .feed { display: flex; flex-direction: column; gap: 8px; max-height: 360px; overflow-y: auto; }
+  .feed .item { padding: 10px 14px; border-radius: 10px; background: var(--bg); font-size: 14px; }
+  .feed .who { color: var(--muted); font-size: 13px; display: flex; justify-content: space-between; gap: 8px; }
+  .feed .empty { color: var(--muted); font-size: 14px; }
+  .pill { font-weight: 700; font-size: 12px; padding: 1px 8px; border-radius: 999px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Warden</h1>
+  <span class="badge net" id="handleBadge" hidden></span>
+  <span class="badge">Sepolia testnet</span>
+  <span class="badge" id="modeBadge" hidden></span>
+</header>
+
+<main>
+  <div class="left">
+    <section class="panel hero">
+      <h2>Check an address before you pay it.</h2>
+      <p>Paste an address or text it to Warden. It reads the code on Sepolia and returns a risk signal with the reasons.</p>
+
+      <div class="chain" id="chain" data-state="idle" aria-hidden="true">
+        <div class="blk" style="--i:0"><b>Address</b><span data-k="address">waiting</span></div>
+        <div class="link" style="--i:0"><i></i><i></i></div>
+        <div class="blk" style="--i:1"><b>Bytecode</b><span data-k="bytecode">waiting</span></div>
+        <div class="link" style="--i:1"><i></i><i></i></div>
+        <div class="blk" style="--i:2"><b>Source</b><span data-k="source">waiting</span></div>
+        <div class="link" style="--i:2"><i></i><i></i></div>
+        <div class="blk gate" style="--i:3"><b>Gate</b><span data-k="gate">waiting</span></div>
+      </div>
+
+      <form id="scanForm">
+        <input id="scanInput" placeholder="0x address or explorer link" autocomplete="off" spellcheck="false" aria-label="Address to screen">
+        <button id="scanBtn">Screen</button>
+      </form>
+      <div class="demos">Try:
+        <button data-addr="0x1111111111111111111111111111111111111111">LOW</button>
+        <button data-addr="0x2222222222222222222222222222222222222222">MEDIUM</button>
+        <button data-addr="0x3333333333333333333333333333333333333333">HIGH (7702)</button>
+        <button data-addr="0x48F8686E6f0f4eB99a9ea89ee68C2ce93a4fBf32">HIGH (Drainer)</button>
+        <button data-addr="send 0.01 to 0x3333333333333333333333333333333333333333">send 0.01 to HIGH</button>
+      </div>
+    </section>
+
+    <section class="panel result empty" id="result" aria-live="polite">Results appear here.</section>
+
+    <section class="panel">
+      <h2 class="label">Live iMessage feed</h2>
+      <div class="feed" id="feed"><div class="empty">Waiting for texts to the Warden handle.</div></div>
+    </section>
+  </div>
+
+  <aside>
+    <div class="phone">
+      <div class="top">
+        <div class="avatar">W</div>
+        <div class="name">Warden</div>
+        <div class="sub">iMessage, try it here</div>
+      </div>
+      <div class="thread" id="thread">
+        <div class="bubble in">Text "send 0.01 to 0x..." and I'll screen the address before anything moves. HIGH risk gets refused. Or text just an address to screen it.</div>
+      </div>
+      <form id="chatForm">
+        <input id="chatInput" placeholder="iMessage" autocomplete="off" spellcheck="false" aria-label="Message Warden">
+        <button>Send</button>
+      </form>
+    </div>
+  </aside>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const session = Math.random().toString(36).slice(2);
+const chainNames = {11155111: "Sepolia", 1: "Ethereum mainnet"};
+const colors = {LOW: "var(--low)", MEDIUM: "var(--med)", HIGH: "var(--high)"};
+const sevRank = {high: 0, medium: 1, low: 2};
+const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+async function send(text) {
+  const res = await fetch("/api/message", {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({text, session}),
+  });
+  return res.json();
+}
+
+/* ---- chain visual ---- */
+const chain = $("chain");
+const blocks = [...chain.querySelectorAll(".blk")];
+const links = [...chain.querySelectorAll(".link")];
+const field = (k) => chain.querySelector(`[data-k="${k}"]`);
+let scramble = null;
+
+function hex(n) { let s = ""; while (s.length < n) s += Math.floor(Math.random() * 16).toString(16); return s; }
+
+function chainScanning() {
+  chain.dataset.state = "scanning"; delete chain.dataset.verdict;
+  blocks.forEach((b) => b.removeAttribute("data-s"));
+  links.forEach((l) => l.classList.remove("ok", "broken"));
+  if (reduced) { chain.querySelectorAll("[data-k]").forEach((s) => (s.textContent = "checking")); return; }
+  clearInterval(scramble);
+  scramble = setInterval(() => chain.querySelectorAll("[data-k]").forEach((s) => (s.textContent = "0x" + hex(8))), 70);
+}
+
+function chainDone(result) {
+  clearInterval(scramble);
+  const worst = result.findings.reduce((w, f) => Math.min(w, sevRank[f.severity.toLowerCase()] ?? 2), 3);
+  const lvl = ["high", "medium", "low"][worst];
+  const t = result.target;
+  field("address").textContent = t.slice(0, 6) + "..." + t.slice(-4);
+  field("bytecode").textContent = worst <= 1 ? "flagged" : "no flags";
+  field("source").textContent = result.verified ? "verified" : "bytecode only";
+  field("gate").textContent = {LOW: "open", MEDIUM: "confirm", HIGH: "refused"}[result.verdict] || "waiting";
+  const state = [ "low", worst <= 1 ? lvl : "low", result.verified ? "low" : "medium", result.verdict.toLowerCase() ];
+  blocks.forEach((b, i) => (b.dataset.s = state[i]));
+  chain.dataset.verdict = result.verdict;
+  chain.dataset.state = "done";
+  links.forEach((l, i) => {
+    const gateLink = i === links.length - 1;
+    l.classList.toggle("broken", gateLink && result.verdict === "HIGH");
+    l.classList.toggle("ok", !(gateLink && result.verdict === "HIGH"));
+  });
+}
+
+function chainIdle() {
+  clearInterval(scramble);
+  chain.dataset.state = "idle"; delete chain.dataset.verdict;
+  blocks.forEach((b) => b.removeAttribute("data-s"));
+  links.forEach((l) => l.classList.remove("ok", "broken"));
+  chain.querySelectorAll("[data-k]").forEach((s) => (s.textContent = "waiting"));
+}
+
+/* ---- result ---- */
+function gateLine(kind) {
+  return {refused: ["Transfer refused", "high"], confirm: ["Waiting for YES", "medium"],
+          screened: ["Screened only", "low"]}[kind];
+}
+
+function countUp(el, to) {
+  if (reduced) { el.textContent = to; return; }
+  const start = performance.now(), dur = 900;
+  const tick = (now) => {
+    const p = Math.min(1, (now - start) / dur);
+    el.textContent = Math.round(to * (1 - Math.pow(1 - p, 3)));
+    if (p < 1) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+
+function renderResult(result, reply, source, kind) {
+  const el = $("result");
+  el.classList.remove("empty");
+  const findings = [...result.findings].sort((a, b) => (sevRank[a.severity.toLowerCase()] ?? 3) - (sevRank[b.severity.toLowerCase()] ?? 3));
+  const disclaimer = (reply.match(/Risk signal, not a guarantee[^\n]*/) || ["Risk signal, not a guarantee. Not a full audit."])[0];
+  const g = gateLine(kind);
+  el.innerHTML = `
+    <h2 class="label">Result</h2>
+    ${g ? `<div class="gate-line ${g[1]} rise">${g[0]}</div>` : ""}
+    <div class="verdict-row">
+      <span class="verdict ${esc(result.verdict)} rise">${esc(result.verdict)}</span>
+      <div class="score">Risk score <span class="num" id="num">0</span>/100
+        <div class="bar"><span id="barFill" style="background:${colors[result.verdict] || "var(--accent)"}"></span></div>
+      </div>
+    </div>
+    <div class="meta">
+      <span class="chip ${result.verified ? "verified" : "unverified"}">${result.verified ? "Verified source" : "Unverified: bytecode checks only"}</span>
+      <span class="chip">${esc(chainNames[result.chainId] || "chain " + result.chainId)}</span>
+      <span class="chip"><code>${esc(result.target)}</code></span>
+    </div>
+    ${findings.length
+      ? `<ul class="findings">${findings.map((f, i) => `<li class="${esc(f.severity.toLowerCase())} rise" style="--i:${i + 2}">
+           <div class="fid">${esc(f.severity.toUpperCase())} | ${esc(f.id)}</div>${esc(f.message)}</li>`).join("")}</ul>`
+      : `<p>The scan flagged no issues. That does not rule out risks it does not check for.</p>`}
+    <div class="disclaimer">${esc(disclaimer)}</div>
+    <div class="source">${esc(source)}</div>`;
+  requestAnimationFrame(() => requestAnimationFrame(() => { $("barFill").style.width = Number(result.riskScore) + "%"; }));
+  countUp($("num"), Number(result.riskScore));
+}
+
+/* ---- chat ---- */
+function bubble(text, dir) {
+  const b = document.createElement("div");
+  b.className = "bubble " + dir;
+  b.textContent = text;
+  $("thread").appendChild(b);
+  $("thread").scrollTop = $("thread").scrollHeight;
+}
+
+let busy = false;
+async function chat(text) {
+  if (busy) return;
+  busy = true; $("scanBtn").disabled = true;
+  bubble(text, "out");
+  const typing = document.createElement("div");
+  typing.className = "typing"; typing.innerHTML = 'Warden is checking <span class="dots"><i>.</i><i>.</i><i>.</i></span>';
+  $("thread").appendChild(typing);
+  $("thread").scrollTop = $("thread").scrollHeight;
+  chainScanning();
+  const started = performance.now();
+  try {
+    const out = await send(text);
+    const wait = Math.max(0, 900 - (performance.now() - started)); // let the scan read as a scan
+    await new Promise((r) => setTimeout(r, reduced ? 0 : wait));
+    typing.remove();
+    bubble(out.reply, "in");
+    if (out.result) { chainDone(out.result); renderResult(out.result, out.reply, "from the in-page chat (web never sends money)", out.kind); }
+    else chainIdle();
+  } catch (e) {
+    typing.remove(); bubble("Could not reach the server. Try again.", "in"); chainIdle();
+  } finally {
+    busy = false; $("scanBtn").disabled = false;
+  }
+}
+
+$("chatForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const text = $("chatInput").value.trim();
+  if (text) { $("chatInput").value = ""; chat(text); }
+});
+$("scanForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const text = $("scanInput").value.trim();
+  if (text) chat(text);
+});
+document.querySelectorAll(".demos button").forEach((b) =>
+  b.addEventListener("click", () => { $("scanInput").value = b.dataset.addr; chat(b.dataset.addr); }));
+
+/* ---- live feed ---- */
+const kindLabel = {refused: "refused", confirm: "asked for YES", sent: "sent",
+  demo_sent: "confirmed (demo, not sent)", screened: "screened only", scan: "screened",
+  followup: "follow-up", cancelled: "cancelled"};
+let after = 0, first = true;
+async function poll() {
+  try {
+    const {events} = await (await fetch("/api/events?after=" + after)).json();
+    for (const ev of events) {
+      after = ev.i + 1;
+      if (ev.channel !== "imessage") continue;
+      const feed = $("feed");
+      feed.querySelector(".empty")?.remove();
+      const item = document.createElement("div");
+      item.className = "item" + (first ? "" : " fresh");
+      const v = ev.result?.verdict;
+      item.innerHTML = `<div class="who"><span>${esc(ev.sender)} at ${new Date(ev.ts * 1000).toLocaleTimeString()}</span>
+        ${v ? `<span class="pill verdict ${esc(v)}">${esc(v)}</span>` : ""}</div><div>${esc(ev.text)}</div>
+        <div class="who" style="margin-top:4px"><span>${esc(kindLabel[ev.kind] || "")}</span></div>`;
+      feed.prepend(item);
+      if (!first && ev.result) { chainDone(ev.result); renderResult(ev.result, ev.reply, `from iMessage (${ev.sender})`, ev.kind); }
+    }
+  } catch (e) {}
+  first = false;
+  setTimeout(poll, 1500);
+}
+fetch("/api/status").then((r) => r.json()).then((s) => {
+  const parts = [`Auditor: ${s.mode.auditor}`, `Agent: ${s.mode.agent}`, `transfers: ${s.mode.transfers}`];
+  $("modeBadge").textContent = parts.join(", ");
+  $("modeBadge").classList.toggle("mock", s.mode.auditor === "mock" || s.mode.transfers === "demo");
+  $("modeBadge").hidden = false;
+  if (s.handle) {
+    $("handleBadge").textContent = "Text Warden: " + s.handle;
+    $("handleBadge").hidden = false;
+    document.querySelector(".phone .sub").textContent = s.handle + ", try it here";
+  }
+});
+poll();
+</script>
+</body>
+</html>
