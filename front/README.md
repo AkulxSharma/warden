@@ -25,7 +25,11 @@ python3 -m front.dashboard                       # http://localhost:8787
 python3 -m front.imessage                        # uses .env
 caffeinate -i python3 -m front.imessage --mode public   # judging
 python3 -m unittest discover tests
+cloudflared tunnel --no-autoupdate --url http://localhost:8787   # public link (trycloudflare.com)
 ```
+
+The quick-tunnel URL changes every time cloudflared restarts, so keep it running through judging
+and re-check the link in the submission if it restarts.
 
 The bot needs Full Disk Access (to read `~/Library/Messages/chat.db`) for the app it runs in,
 and asks for Automation access to Messages on the first reply.
