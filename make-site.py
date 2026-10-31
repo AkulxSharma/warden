@@ -35,13 +35,13 @@ def main(src_dir, out_dir, api, handle=""):
     hint = (f"Paste an address, or text “Hey Warden” to {handle} on iMessage" if handle
             else "Paste an address or a name like vault.eth")
     h = swap(h, 'placeholder="0x address or explorer link"', f'placeholder="{hint}"')
-    # demo buttons: only ones that work (they screen a name), labelled with what Warden really returns
-    demos = [("LOW", "akul.eth"), ("MEDIUM", "rugpull.eth"), ("MEDIUM", "proxy.eth"),
-             ("MEDIUM", "phisher.eth"), ("HIGH", "vault.eth"), ("HIGH", "drainer.eth")]
-    buttons = "".join(f'\n        <button data-addr="{name}">{level} ({name})</button>' for level, name in demos)
-    h, n = re.subn(r'<div class="demos">.*?</div>', f'<div class="demos">Try:{buttons}\n      </div>', h, count=1, flags=re.S)
+    # no demo buttons or sample commands: the page only shows the Screen form and live data
+    h, n = re.subn(r'\n      <div class="demos">.*?</div>', "", h, count=1, flags=re.S)
     if n != 1:
         sys.exit("make-site: demo buttons block not found")
+    h, n = re.subn(r'document\.querySelectorAll\("\.demos button"\)\.forEach\(.*?\)\);\n', "", h, count=1, flags=re.S)
+    if n != 1:
+        sys.exit("make-site: demo buttons handler not found")
     # images: relative so they work from any host
     h = h.replace('href="/img/icon.png"', 'href="img/icon.png"')
     h = h.replace('src="/img/icon.png"', 'src="img/icon.png"')
