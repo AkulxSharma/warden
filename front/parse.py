@@ -49,7 +49,7 @@ CHAIN_WORDS = [
 CHAIN_NAMES = {SEPOLIA: "Sepolia", 1: "Ethereum mainnet", 8453: "Base", 84532: "Base Sepolia",
                42161: "Arbitrum", 10: "Optimism", 137: "Polygon", 56: "BNB Chain"}
 
-YES_WORDS = {"yes", "y", "yes send", "confirm", "send it"}
+YES_WORDS = {"yes", "y", "yep", "yeah", "yes send", "confirm", "send it"}
 NO_WORDS = {"no", "n", "cancel", "stop", "nevermind", "never mind"}
 TRANSFER_RE = re.compile(r"\b(?:send|pay|transfer)\b", re.I)
 AMOUNT_RE = re.compile(r"(?<![0-9a-fx.])(\d+(?:\.\d+)?|\.\d+)\s*(?:sepolia\s*)?(?:eth|ether)?\b", re.I)
@@ -110,7 +110,7 @@ def parse(text):
             return Parsed("transfer", addresses[0], chain_id, is_link, addresses[1:], amount)
         return Parsed("scan", addresses[0], chain_id, is_link, addresses[1:])
 
-    word = text.lower().strip("!. ")
+    word = " ".join(text.lower().strip().strip("!.,;: ").split())
     if word in YES_WORDS:
         return Parsed("yes")
     if word in NO_WORDS:

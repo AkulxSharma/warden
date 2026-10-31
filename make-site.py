@@ -157,6 +157,39 @@ async function chat(text) {
     if n != 1:
         sys.exit("make-site: status block not found")
 
+    # after YES / NO / expiry the result panel must stop saying "Waiting for YES": settle it from the event
+    h = swap(h, "async function pollWallets() {", "async function loadWallets() {")
+    h = swap(h, "  setTimeout(pollWallets, 6000);\n}\npollWallets();",
+             "}\nasync function pollWallets() { await loadWallets(); setTimeout(pollWallets, 6000); }\npollWallets();")
+    h, n = re.subn(r"(      if \(!first && ev\.result\) \{[^\n]*\})\n", r"\1 else if (!first) settleGate(ev);\n", h, count=1)
+    if n != 1:
+        sys.exit("make-site: live feed render line not found")
+    settle = r"""/* ---- settle the result panel when the sender answers (YES, NO, expiry) ---- */
+const SETTLED = {
+  sent: ["Payment sent", "low"],
+  demo_sent: ["Confirmed (demo, nothing sent)", "medium"],
+  cancelled: ["Cancelled, nothing sent", "medium"],
+  expired: ["Expired, nothing sent", "medium"],
+  send_failed: ["Transfer failed, nothing sent", "high"],
+};
+function settleGate(ev) {
+  const s = SETTLED[ev.kind];
+  const g = $("result").querySelector(".gate-line");
+  if (!s || !g) return;
+  g.textContent = s[0];
+  g.className = "gate-line " + s[1] + " rise";
+  const tx = ((ev.reply || "").match(/https:\/\/sepolia\.etherscan\.io\/tx\/0x[0-9a-fA-F]{64}/) || [])[0];
+  if (tx) {
+    const a = document.createElement("a");
+    a.href = tx; a.target = "_blank"; a.rel = "noopener"; a.textContent = " View transaction";
+    g.append(a);
+  }
+  loadWallets();   // balances and the transfer list refresh right away, not on the next 6 second tick
+}
+
+"""
+    h = swap(h, "/* ---- live feed ---- */", settle + "/* ---- live feed ---- */")
+
     for gone in ('fetch("/api/', 'fetch("/api/status', '$("thread")', '$("chatForm")', 'chatInput'):
         if gone in h:
             sys.exit(f"make-site: leftover reference {gone!r}")
