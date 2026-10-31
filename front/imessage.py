@@ -31,6 +31,8 @@ import sys
 import time
 from pathlib import Path
 
+import aliases
+
 from . import config
 from .parse import parse
 from .pipeline import handle_message
