@@ -159,6 +159,12 @@ def send_eth(to, amount_wei, chain_id=SEPOLIA):
     return tx_hash
 
 
+def send_amount(to, amount_eth):
+    """send_eth for a decimal ETH amount (the front end's WARDEN_TRANSFER=wallet:send_amount hook)."""
+    from decimal import Decimal
+    return send_eth(to, int(Decimal(str(amount_eth)) * 10**18))
+
+
 def _new_wallet():
     if os.environ.get("SEPOLIA_PRIVATE_KEY"):
         print("A wallet key already exists in .env. Not making another.")

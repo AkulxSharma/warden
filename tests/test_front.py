@@ -1,8 +1,11 @@
 """Front-end tests: parser, mocks, pipeline. Run: python3 -m unittest discover tests"""
+import os
 import re
 import tempfile
 import unittest
 from pathlib import Path
+
+os.environ["WARDEN_AUDITOR_URL"] = ""  # keep a live URL in .env out of the tests
 
 from front import mock_agent, mock_auditor, pipeline
 from front import config
@@ -110,10 +113,20 @@ class TransferFlowTest(unittest.TestCase):
         return pipeline.handle_message(text, session=session, can_transfer=team)
 
     def test_gate(self):
-        self.assertEqual(pipeline.gate(None), "refuse")
-        self.assertEqual(pipeline.gate({"verdict": "HIGH"}), "refuse")
-        self.assertEqual(pipeline.gate({"verdict": "MEDIUM"}), "confirm")
-        self.assertEqual(pipeline.gate({"verdict": "LOW"}), "confirm")
+        a = "0x" + "4" * 40
+
+        def scan(verdict="LOW", findings=(), target=a, chain=11155111):
+            return {"target": target, "chainId": chain, "verdict": verdict, "riskScore": 5,
+                    "verified": True, "findings": list(findings)}
+        high = {"id": "selfdestruct-opcode", "severity": "high", "message": "m"}
+        self.assertEqual(pipeline.gate(None, a), "refuse")
+        self.assertEqual(pipeline.gate(scan("HIGH"), a), "refuse")
+        self.assertEqual(pipeline.gate(scan("MEDIUM"), a), "confirm")
+        self.assertEqual(pipeline.gate(scan("LOW"), a), "confirm")
+        self.assertEqual(pipeline.gate(scan("LOW", [high]), a), "refuse")          # high finding, low verdict
+        self.assertEqual(pipeline.gate(scan(target="0x" + "5" * 40), a), "refuse")  # wrong address
+        self.assertEqual(pipeline.gate(scan(chain=1), a), "refuse")                 # wrong chain
+        self.assertEqual(pipeline.gate({"verdict": "LOW"}, a), "refuse")            # not schema-valid
 
     def test_high_refused_and_yes_sends_nothing(self):
         self.assertEqual(self.send(f"send 0.01 to {HIGH}")["kind"], "refused")

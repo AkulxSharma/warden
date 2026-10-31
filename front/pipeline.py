@@ -18,6 +18,8 @@ import threading
 import time
 from pathlib import Path
 
+import transfer
+
 from . import services
 from .parse import SEPOLIA, chain_name, parse
 
@@ -53,11 +55,14 @@ def max_send():
     return float(os.environ.get("WARDEN_MAX_SEND_ETH", "0.01"))
 
 
-def gate(result):
-    """The send decision, in code. result is the Auditor dict, or None if the check failed."""
-    if result is None or result.get("verdict") == "HIGH":
+def gate(result, address, chain_id=SEPOLIA):
+    """The send decision, in code. result is the Auditor dict, or None if the check failed.
+    Delegates to transfer.gate so there is one gate: a schema-invalid result, a result for another
+    address or chain, a HIGH verdict, or any high-severity finding all refuse."""
+    if (result is None or not transfer.check_scan(result)
+            or result["target"].lower() != address.lower() or result["chainId"] != chain_id):
         return "refuse"
-    return "confirm"
+    return transfer.gate(result)
 
 
 def short(address):
@@ -87,7 +92,7 @@ def _transfer(parsed, state, can_transfer):
     result, _ = _screen(parsed.address, SEPOLIA)
     if result:
         state["result"], state["history"] = result, []
-    if gate(result) == "refuse":
+    if gate(result, parsed.address) == "refuse":
         state["pending"] = None
         if result is None:
             return "refused", CHECK_FAILED, None
