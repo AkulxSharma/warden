@@ -67,7 +67,8 @@ def decide(text, chat_key, open_chats, now):
     ("end", None) the user ended the session, ("handle", text) pass text to the pipeline.
     Mutates open_chats (chat key -> time of last activity).
     """
-    active = now - open_chats.get(chat_key, 0) <= CHAT_IDLE_SECONDS
+    last = open_chats.get(chat_key)
+    active = last is not None and now - last <= CHAT_IDLE_SECONDS
     if END.match(text):
         open_chats.pop(chat_key, None)
         return ("end", None) if active else ("ignore", None)
