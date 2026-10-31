@@ -7,3 +7,5 @@ node_modules/
 fixtures/out*.json
 fixtures/err.log
 __pycache__/
+data/
+!.env.example

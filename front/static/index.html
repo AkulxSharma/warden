@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Warden</title>
+<style>
+  :root {
+    --bg: #f5f6f8; --panel: #ffffff; --ink: #14171c; --muted: #646b76; --line: #e2e5ea;
+    --accent: #2f6fed; --low: #1f8a4c; --med: #b7791f; --high: #c53030;
+    --low-bg: #e7f5ec; --med-bg: #fbf1e0; --high-bg: #fbe6e6;
+    --bubble-in: #e9e9eb; --bubble-in-ink: #14171c; --bubble-out: #0a84ff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e1013; --panel: #171a1f; --ink: #e8eaee; --muted: #9aa1ab; --line: #2a2f37;
+      --accent: #6b9bff; --low: #4cc27e; --med: #e0a84a; --high: #f07070;
+      --low-bg: #15291e; --med-bg: #2d2414; --high-bg: #321818;
+      --bubble-in: #26282d; --bubble-in-ink: #e8eaee;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 15px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif; }
+  header { display: flex; align-items: center; gap: 12px; padding: 18px 24px; border-bottom: 1px solid var(--line); }
+  header h1 { font-size: 20px; margin: 0; letter-spacing: -0.01em; }
+  header .tag { color: var(--muted); font-size: 14px; }
+  .badge { font-size: 12px; padding: 3px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+  .badge.mock { border-color: var(--med); color: var(--med); }
+  .badge.net { margin-left: auto; }
+  main { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 20px; padding: 20px 24px; max-width: 1200px; margin: 0 auto; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; padding: 16px; } }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
+  .panel h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0 0 12px; }
+  form { display: flex; gap: 8px; }
+  input { flex: 1; min-width: 0; font: inherit; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line);
+          background: var(--bg); color: var(--ink); }
+  input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  button { font: inherit; font-weight: 600; padding: 10px 16px; border-radius: 10px; border: 0; background: var(--accent); color: #fff; cursor: pointer; }
+  .demos { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; font-size: 13px; color: var(--muted); align-items: center; }
+  .demos button { background: transparent; color: var(--accent); border: 1px solid var(--line); padding: 4px 10px; font-weight: 500; font-size: 13px; }
+  .left { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+  .result.empty { color: var(--muted); }
+  .verdict-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .verdict { font-weight: 700; font-size: 22px; padding: 6px 14px; border-radius: 10px; }
+  .verdict.LOW { color: var(--low); background: var(--low-bg); }
+  .verdict.MEDIUM { color: var(--med); background: var(--med-bg); }
+  .verdict.HIGH { color: var(--high); background: var(--high-bg); }
+  .score { flex: 1; min-width: 160px; }
+  .score .num { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .bar { height: 8px; border-radius: 99px; background: var(--line); margin-top: 6px; overflow: hidden; }
+  .bar span { display: block; height: 100%; border-radius: 99px; transition: width .4s; }
+  .meta { display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0 6px; font-size: 13px; }
+  .meta .chip { padding: 3px 9px; border-radius: 999px; background: var(--bg); border: 1px solid var(--line); }
+  .meta .unverified { color: var(--med); border-color: var(--med); }
+  .meta .verified { color: var(--low); border-color: var(--low); }
+  code { font: 13px ui-monospace, "SF Mono", Menlo, monospace; word-break: break-all; }
+  ul.findings { list-style: none; padding: 0; margin: 12px 0; display: flex; flex-direction: column; gap: 8px; }
+  ul.findings li { padding: 10px 12px; border-radius: 10px; background: var(--bg); border-left: 3px solid var(--line); }
+  ul.findings li.high { border-left-color: var(--high); }
+  ul.findings li.medium { border-left-color: var(--med); }
+  ul.findings li.low { border-left-color: var(--low); }
+  ul.findings .fid { font-size: 12px; color: var(--muted); }
+  .disclaimer { font-size: 13px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 10px; margin-top: 12px; }
+  .source { font-size: 12px; color: var(--muted); margin-top: 8px; }
+  .phone { border-radius: 28px; border: 1px solid var(--line); background: var(--panel); display: flex; flex-direction: column; height: 640px; overflow: hidden; }
+  .phone .top { text-align: center; padding: 14px 10px 10px; border-bottom: 1px solid var(--line); }
+  .phone .avatar { width: 40px; height: 40px; border-radius: 50%; margin: 0 auto 4px; background: var(--accent); color: #fff;
+                   display: grid; place-items: center; font-size: 20px; }
+  .phone .name { font-size: 13px; font-weight: 600; }
+  .phone .sub { font-size: 11px; color: var(--muted); }
+  .thread { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+  .bubble { max-width: 82%; padding: 8px 12px; border-radius: 18px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; }
+  .bubble.in { align-self: flex-start; background: var(--bubble-in); color: var(--bubble-in-ink); border-bottom-left-radius: 6px; }
+  .bubble.out { align-self: flex-end; background: var(--bubble-out); color: #fff; border-bottom-right-radius: 6px; }
+  .typing { align-self: flex-start; color: var(--muted); font-size: 13px; padding: 4px 8px; }
+  .phone form { padding: 10px; border-top: 1px solid var(--line); }
+  .phone input { border-radius: 999px; }
+  .phone button { border-radius: 999px; padding: 8px 14px; }
+  .feed { display: flex; flex-direction: column; gap: 8px; max-height: 360px; overflow-y: auto; }
+  .feed .item { padding: 10px 12px; border-radius: 10px; background: var(--bg); font-size: 13px; }
+  .feed .item.fresh { animation: flash 1.6s ease-out; }
+  @keyframes flash { from { box-shadow: 0 0 0 2px var(--accent); } to { box-shadow: 0 0 0 0 transparent; } }
+  .feed .who { color: var(--muted); font-size: 12px; display: flex; justify-content: space-between; gap: 8px; }
+  .feed .empty { color: var(--muted); font-size: 13px; }
+  .gate { display: inline-block; font-weight: 700; font-size: 13px; padding: 4px 10px; border-radius: 8px; margin-bottom: 12px; }
+  .gate.high { color: var(--high); background: var(--high-bg); }
+  .gate.medium { color: var(--med); background: var(--med-bg); }
+  .gate.low { color: var(--muted); background: var(--bg); }
+  .pill { font-weight: 700; font-size: 11px; padding: 1px 6px; border-radius: 6px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🛡 Warden</h1>
+  <span class="tag">A firewall for crypto payments, over iMessage.</span>
+  <span class="badge net" id="handleBadge" hidden></span>
+  <span class="badge">Sepolia testnet</span>
+  <span class="badge" id="modeBadge" hidden></span>
+</header>
+
+<main>
+  <div class="left">
+    <section class="panel">
+      <h2>Screen an address</h2>
+      <form id="scanForm">
+        <input id="scanInput" placeholder="0x… address or explorer link" autocomplete="off" spellcheck="false">
+        <button>Screen</button>
+      </form>
+      <div class="demos">Try:
+        <button data-addr="0x1111111111111111111111111111111111111111">LOW</button>
+        <button data-addr="0x2222222222222222222222222222222222222222">MEDIUM</button>
+        <button data-addr="0x3333333333333333333333333333333333333333">HIGH (7702)</button>
+        <button data-addr="send 0.01 to 0x3333333333333333333333333333333333333333">send 0.01 → HIGH</button>
+      </div>
+    </section>
+
+    <section class="panel result empty" id="result">Screen an address, or text the Warden handle. The result shows up here.</section>
+
+    <section class="panel">
+      <h2>Live iMessage feed</h2>
+      <div class="feed" id="feed"><div class="empty">Waiting for texts to the Warden handle…</div></div>
+    </section>
+  </div>
+
+  <aside>
+    <div class="phone">
+      <div class="top">
+        <div class="avatar">🛡</div>
+        <div class="name">Warden</div>
+        <div class="sub">iMessage · try it here</div>
+      </div>
+      <div class="thread" id="thread">
+        <div class="bubble in">Text "send 0.01 to 0x…" and I'll screen the address before anything moves. HIGH risk gets refused. Or text just an address to screen it.</div>
+      </div>
+      <form id="chatForm">
+        <input id="chatInput" placeholder="iMessage" autocomplete="off" spellcheck="false">
+        <button>↑</button>
+      </form>
+    </div>
+  </aside>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const session = Math.random().toString(36).slice(2);
+const chainNames = {11155111: "Sepolia", 1: "Ethereum mainnet"};
+const colors = {LOW: "var(--low)", MEDIUM: "var(--med)", HIGH: "var(--high)"};
+const sevRank = {high: 0, medium: 1, low: 2};
+
+async function send(text) {
+  const res = await fetch("/api/message", {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({text, session}),
+  });
+  return res.json();
+}
+
+function gateLine(kind) {
+  return {refused: ["⛔ Transfer refused", "high"], confirm: ["⏳ Waiting for YES", "medium"],
+          screened: ["Screened only", "low"]}[kind];
+}
+
+function renderResult(result, reply, source, kind) {
+  const el = $("result");
+  el.classList.remove("empty");
+  const findings = [...result.findings].sort((a, b) => (sevRank[a.severity.toLowerCase()] ?? 3) - (sevRank[b.severity.toLowerCase()] ?? 3));
+  const disclaimer = (reply.match(/Risk signal, not a guarantee[^\n]*/) || ["Risk signal, not a guarantee. Not a full audit."])[0];
+  el.innerHTML = `
+    <h2>Result</h2>
+    ${gateLine(kind) ? `<div class="gate ${gateLine(kind)[1]}">${gateLine(kind)[0]}</div>` : ""}
+    <div class="verdict-row">
+      <span class="verdict ${esc(result.verdict)}">${esc(result.verdict)}</span>
+      <div class="score">riskScore <span class="num">${Number(result.riskScore)}</span>/100
+        <div class="bar"><span style="width:${Number(result.riskScore)}%;background:${colors[result.verdict] || "var(--accent)"}"></span></div>
+      </div>
+    </div>
+    <div class="meta">
+      <span class="chip ${result.verified ? "verified" : "unverified"}">${result.verified ? "✓ verified source" : "⚠ unverified: bytecode checks only"}</span>
+      <span class="chip">${esc(chainNames[result.chainId] || "chain " + result.chainId)}</span>
+      <span class="chip"><code>${esc(result.target)}</code></span>
+    </div>
+    ${findings.length
+      ? `<ul class="findings">${findings.map((f) => `<li class="${esc(f.severity.toLowerCase())}">
+           <div class="fid">${esc(f.severity.toUpperCase())} · ${esc(f.id)}</div>${esc(f.message)}</li>`).join("")}</ul>`
+      : `<p>The scan flagged no issues. That does not rule out risks it does not check for.</p>`}
+    <div class="disclaimer">${esc(disclaimer)}</div>
+    <div class="source">${esc(source)}</div>`;
+}
+
+function bubble(text, dir) {
+  const b = document.createElement("div");
+  b.className = "bubble " + dir;
+  b.textContent = text;
+  $("thread").appendChild(b);
+  $("thread").scrollTop = $("thread").scrollHeight;
+}
+
+async function chat(text) {
+  bubble(text, "out");
+  const typing = document.createElement("div");
+  typing.className = "typing"; typing.textContent = "Warden is scanning…";
+  $("thread").appendChild(typing);
+  const out = await send(text);
+  typing.remove();
+  bubble(out.reply, "in");
+  if (out.result) renderResult(out.result, out.reply, "from the in-page chat (web never sends money)", out.kind);
+}
+
+$("chatForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const text = $("chatInput").value.trim();
+  if (text) { $("chatInput").value = ""; chat(text); }
+});
+$("scanForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const text = $("scanInput").value.trim();
+  if (text) chat(text);
+});
+document.querySelectorAll(".demos button").forEach((b) =>
+  b.addEventListener("click", () => { $("scanInput").value = b.dataset.addr; chat(b.dataset.addr); }));
+
+const kindLabel = {refused: "⛔ refused", confirm: "⏳ asked for YES", sent: "✅ sent",
+  demo_sent: "✅ confirmed (demo, not sent)", screened: "screened only", scan: "screened",
+  followup: "follow-up", cancelled: "cancelled"};
+let after = 0, first = true;
+async function poll() {
+  try {
+    const {events} = await (await fetch("/api/events?after=" + after)).json();
+    for (const ev of events) {
+      after = ev.i + 1;
+      if (ev.channel !== "imessage") continue;
+      const feed = $("feed");
+      feed.querySelector(".empty")?.remove();
+      const item = document.createElement("div");
+      item.className = "item" + (first ? "" : " fresh");
+      const v = ev.result?.verdict;
+      item.innerHTML = `<div class="who"><span>📱 ${esc(ev.sender)} · ${new Date(ev.ts * 1000).toLocaleTimeString()}</span>
+        ${v ? `<span class="pill verdict ${esc(v)}">${esc(v)}</span>` : ""}</div><div>${esc(ev.text)}</div>
+        <div class="who" style="margin-top:4px"><span>${esc(kindLabel[ev.kind] || "")}</span></div>`;
+      feed.prepend(item);
+      if (!first && ev.result) renderResult(ev.result, ev.reply, `from iMessage (${ev.sender})`, ev.kind);
+    }
+  } catch (e) {}
+  first = false;
+  setTimeout(poll, 1500);
+}
+fetch("/api/status").then((r) => r.json()).then((s) => {
+  const parts = [`Auditor: ${s.mode.auditor}`, `Agent: ${s.mode.agent}`, `transfers: ${s.mode.transfers}`];
+  $("modeBadge").textContent = parts.join(" · ");
+  $("modeBadge").classList.toggle("mock", s.mode.auditor === "mock" || s.mode.transfers === "demo");
+  $("modeBadge").hidden = false;
+  if (s.handle) {
+    $("handleBadge").textContent = "📱 Text Warden: " + s.handle;
+    $("handleBadge").hidden = false;
+    document.querySelector(".phone .sub").textContent = s.handle + " · try it here";
+  }
+});
+poll();
+</script>
+</body>
+</html>
