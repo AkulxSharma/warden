@@ -47,16 +47,22 @@ CHAIN_WORDS = [
 CHAIN_NAMES = {SEPOLIA: "Sepolia", 1: "Ethereum mainnet", 8453: "Base", 84532: "Base Sepolia",
                42161: "Arbitrum", 10: "Optimism", 137: "Polygon", 56: "BNB Chain"}
 
+YES_WORDS = {"yes", "y", "yes send", "confirm", "send it"}
+NO_WORDS = {"no", "n", "cancel", "stop", "nevermind", "never mind"}
+TRANSFER_RE = re.compile(r"\b(?:send|pay|transfer)\b", re.I)
+AMOUNT_RE = re.compile(r"(?<![0-9a-fx.])(\d+(?:\.\d+)?|\.\d+)\s*(?:sepolia\s*)?(?:eth|ether)?\b", re.I)
+
 HELP_WORDS = {"help", "hi", "hello", "hey", "start", "?", "what is this", "how does this work"}
 
 
 @dataclass
 class Parsed:
-    kind: str                      # "scan" | "help" | "tx_hash" | "ens" | "link_no_address" | "text"
+    kind: str                      # "scan" | "transfer" | "yes" | "no" | "help" | "tx_hash" | "ens" | "link_no_address" | "text"
     address: str | None = None
     chain_id: int | None = None    # None means not stated by the user
     is_link: bool = False
     extra_addresses: list = field(default_factory=list)
+    amount: float | None = None    # ETH, for "send 0.01 to 0x..."
 
 
 def chain_name(chain_id):
@@ -91,7 +97,18 @@ def parse(text):
         for url in urls:
             chain_id = _chain_from_url(url) or chain_id
         chain_id = chain_id or _chain_from_words(text)
+        if TRANSFER_RE.search(text):
+            rest = ADDRESS_RE.sub(" ", text)
+            match = AMOUNT_RE.search(rest)
+            amount = float(match.group(1)) if match else None
+            return Parsed("transfer", addresses[0], chain_id, is_link, addresses[1:], amount)
         return Parsed("scan", addresses[0], chain_id, is_link, addresses[1:])
+
+    word = text.lower().strip("!. ")
+    if word in YES_WORDS:
+        return Parsed("yes")
+    if word in NO_WORDS:
+        return Parsed("no")
 
     if TX_HASH_RE.search(text):
         return Parsed("tx_hash", is_link=is_link)

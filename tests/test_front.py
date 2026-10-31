@@ -93,6 +93,66 @@ class PipelineTest(unittest.TestCase):
         self.assertEqual(pipeline.handle_message("yo", session="c")["reply"], pipeline.ASK_ADDRESS)
 
 
+class TransferFlowTest(unittest.TestCase):
+    """The gate is code: HIGH or a failed check refuses; YES only after a passing check."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.old = pipeline.EVENTS
+        pipeline.EVENTS = Path(self.tmp.name) / "events.jsonl"
+        pipeline._sessions.clear()
+
+    def tearDown(self):
+        pipeline.EVENTS = self.old
+        self.tmp.cleanup()
+
+    def send(self, text, session="t", team=True):
+        return pipeline.handle_message(text, session=session, can_transfer=team)
+
+    def test_gate(self):
+        self.assertEqual(pipeline.gate(None), "refuse")
+        self.assertEqual(pipeline.gate({"verdict": "HIGH"}), "refuse")
+        self.assertEqual(pipeline.gate({"verdict": "MEDIUM"}), "confirm")
+        self.assertEqual(pipeline.gate({"verdict": "LOW"}), "confirm")
+
+    def test_high_refused_and_yes_sends_nothing(self):
+        self.assertEqual(self.send(f"send 0.01 to {HIGH}")["kind"], "refused")
+        self.assertEqual(self.send("YES")["kind"], "yes_nothing")
+
+    def test_medium_asks_then_yes_confirms(self):
+        out = self.send(f"send 0.01 to {MED}")
+        self.assertEqual(out["kind"], "confirm")
+        self.assertIn("Reply YES", out["reply"])
+        self.assertEqual(self.send("yes")["kind"], "demo_sent")
+        self.assertEqual(self.send("yes")["kind"], "yes_nothing")
+
+    def test_no_cancels(self):
+        self.send(f"send 0.01 to {LOW}")
+        self.assertEqual(self.send("no")["reply"], pipeline.CANCELLED)
+        self.assertEqual(self.send("yes")["kind"], "yes_nothing")
+
+    def test_auditor_failure_refuses(self):
+        from unittest import mock
+        with mock.patch.object(pipeline.services, "audit", side_effect=pipeline.services.AuditorError("down")):
+            out = self.send(f"send 0.01 to {LOW}")
+        self.assertEqual((out["kind"], out["reply"]), ("refused", pipeline.CHECK_FAILED))
+        self.assertEqual(self.send("yes")["kind"], "yes_nothing")
+
+    def test_strangers_and_web_never_get_a_pending_send(self):
+        out = self.send(f"send 0.01 to {LOW}", session="s", team=False)
+        self.assertEqual(out["kind"], "screened")
+        self.assertEqual(self.send("yes", session="s", team=False)["kind"], "yes_nothing")
+
+    def test_amount_cap_and_missing_amount(self):
+        self.assertEqual(self.send(f"send 5 eth to {LOW}")["kind"], "blocked_amount")
+        self.assertEqual(self.send(f"send to {LOW}")["kind"], "need_amount")
+
+    def test_expired_pending(self):
+        self.send(f"send 0.01 to {LOW}")
+        pipeline._sessions["t"]["pending"]["ts"] -= pipeline.PENDING_TTL + 1
+        self.assertEqual(self.send("yes")["kind"], "expired")
+
+
 class IMessageHelpersTest(unittest.TestCase):
     def test_decode_attributed_body(self):
         text = "check 0xabc"
@@ -103,6 +163,7 @@ class IMessageHelpersTest(unittest.TestCase):
     def test_public_mode_skips_normal_texts(self):
         self.assertTrue(wants_warden(f"is {HIGH} legit?"))
         self.assertTrue(wants_warden("hey warden"))
+        self.assertTrue(wants_warden(f"send 0.01 to {LOW}"))
         self.assertTrue(wants_warden("https://sepolia.etherscan.io/address/0x123"))
         self.assertFalse(wants_warden("hi"))
         self.assertFalse(wants_warden("dinner at 7?"))

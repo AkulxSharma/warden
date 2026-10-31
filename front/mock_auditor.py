@@ -13,7 +13,7 @@ from pathlib import Path
 
 from .parse import SEPOLIA
 
-DATA = Path(__file__).parent / "mock_data"
+DATA = Path(__file__).resolve().parent.parent / "fixtures" / "auditor-output"  # shared team fixtures
 LEVELS = ("low", "medium", "high")
 _FIXTURES = {name: json.loads((DATA / f"{name}.json").read_text()) for name in LEVELS}
 DEMO_ADDRESSES = {fx["target"].lower(): name for name, fx in _FIXTURES.items()}

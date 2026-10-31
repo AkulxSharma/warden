@@ -121,7 +121,7 @@ def send(text, chat_guid, handle):
 
 def wants_warden(text):
     """Would a stranger's text be meant for Warden? Used in public mode."""
-    return parse(text).kind in {"scan", "tx_hash", "ens", "link_no_address"} or "warden" in text.lower()
+    return parse(text).kind in {"scan", "transfer", "tx_hash", "ens", "link_no_address"} or "warden" in text.lower()
 
 
 def run(allowed, public, dry_run, poll, self_chat=False, agent_handle=""):
@@ -168,7 +168,8 @@ def run(allowed, public, dry_run, poll, self_chat=False, agent_handle=""):
 
             print(f"[warden] <- {mask(handle)}: {text}")
             try:
-                out = handle_message(text, session=chat_guid or handle, channel="imessage", sender=mask(handle))
+                out = handle_message(text, session=chat_key, channel="imessage", sender=mask(handle),
+                                     can_transfer=normalize(handle) in allowed_norm)
             except Exception as exc:  # one bad message must not take the handle down
                 print(f"[warden] error on message {rowid}: {exc!r}", file=sys.stderr)
                 continue

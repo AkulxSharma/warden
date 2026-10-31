@@ -83,34 +83,39 @@
   @keyframes flash { from { box-shadow: 0 0 0 2px var(--accent); } to { box-shadow: 0 0 0 0 transparent; } }
   .feed .who { color: var(--muted); font-size: 12px; display: flex; justify-content: space-between; gap: 8px; }
   .feed .empty { color: var(--muted); font-size: 13px; }
+  .gate { display: inline-block; font-weight: 700; font-size: 13px; padding: 4px 10px; border-radius: 8px; margin-bottom: 12px; }
+  .gate.high { color: var(--high); background: var(--high-bg); }
+  .gate.medium { color: var(--med); background: var(--med-bg); }
+  .gate.low { color: var(--muted); background: var(--bg); }
   .pill { font-weight: 700; font-size: 11px; padding: 1px 6px; border-radius: 6px; }
 </style>
 </head>
 <body>
 <header>
   <h1>🛡 Warden</h1>
-  <span class="tag">Text an address. Get a risk signal before you pay.</span>
+  <span class="tag">A firewall for crypto payments, over iMessage.</span>
   <span class="badge net" id="handleBadge" hidden></span>
   <span class="badge">Sepolia testnet</span>
-  <span class="badge mock" id="mockBadge" hidden>mock Auditor + Agent</span>
+  <span class="badge" id="modeBadge" hidden></span>
 </header>
 
 <main>
   <div class="left">
     <section class="panel">
-      <h2>Scan an address</h2>
+      <h2>Screen an address</h2>
       <form id="scanForm">
         <input id="scanInput" placeholder="0x… address or explorer link" autocomplete="off" spellcheck="false">
-        <button>Scan</button>
+        <button>Screen</button>
       </form>
-      <div class="demos">Demo:
-        <button data-addr="0x1000000000000000000000000000000000000001">LOW</button>
-        <button data-addr="0x2000000000000000000000000000000000000002">MEDIUM</button>
-        <button data-addr="0x7702000000000000000000000000000000000003">HIGH (7702)</button>
+      <div class="demos">Try:
+        <button data-addr="0x1111111111111111111111111111111111111111">LOW</button>
+        <button data-addr="0x2222222222222222222222222222222222222222">MEDIUM</button>
+        <button data-addr="0x3333333333333333333333333333333333333333">HIGH (7702)</button>
+        <button data-addr="send 0.01 to 0x3333333333333333333333333333333333333333">send 0.01 → HIGH</button>
       </div>
     </section>
 
-    <section class="panel result empty" id="result">Scan an address, or text one to the Warden handle. The result shows up here.</section>
+    <section class="panel result empty" id="result">Screen an address, or text the Warden handle. The result shows up here.</section>
 
     <section class="panel">
       <h2>Live iMessage feed</h2>
@@ -126,7 +131,7 @@
         <div class="sub">iMessage · try it here</div>
       </div>
       <div class="thread" id="thread">
-        <div class="bubble in">Text me a 0x address or an explorer link. I'll reply with a risk signal and the reasons.</div>
+        <div class="bubble in">Text "send 0.01 to 0x…" and I'll screen the address before anything moves. HIGH risk gets refused. Or text just an address to screen it.</div>
       </div>
       <form id="chatForm">
         <input id="chatInput" placeholder="iMessage" autocomplete="off" spellcheck="false">
@@ -152,13 +157,19 @@ async function send(text) {
   return res.json();
 }
 
-function renderResult(result, reply, source) {
+function gateLine(kind) {
+  return {refused: ["⛔ Transfer refused", "high"], confirm: ["⏳ Waiting for YES", "medium"],
+          screened: ["Screened only", "low"]}[kind];
+}
+
+function renderResult(result, reply, source, kind) {
   const el = $("result");
   el.classList.remove("empty");
   const findings = [...result.findings].sort((a, b) => (sevRank[a.severity.toLowerCase()] ?? 3) - (sevRank[b.severity.toLowerCase()] ?? 3));
   const disclaimer = (reply.match(/Risk signal, not a guarantee[^\n]*/) || ["Risk signal, not a guarantee. Not a full audit."])[0];
   el.innerHTML = `
     <h2>Result</h2>
+    ${gateLine(kind) ? `<div class="gate ${gateLine(kind)[1]}">${gateLine(kind)[0]}</div>` : ""}
     <div class="verdict-row">
       <span class="verdict ${esc(result.verdict)}">${esc(result.verdict)}</span>
       <div class="score">riskScore <span class="num">${Number(result.riskScore)}</span>/100
@@ -194,7 +205,7 @@ async function chat(text) {
   const out = await send(text);
   typing.remove();
   bubble(out.reply, "in");
-  if (out.result) renderResult(out.result, out.reply, "from the in-page chat");
+  if (out.result) renderResult(out.result, out.reply, "from the in-page chat (web never sends money)", out.kind);
 }
 
 $("chatForm").addEventListener("submit", (e) => {
@@ -210,6 +221,9 @@ $("scanForm").addEventListener("submit", (e) => {
 document.querySelectorAll(".demos button").forEach((b) =>
   b.addEventListener("click", () => { $("scanInput").value = b.dataset.addr; chat(b.dataset.addr); }));
 
+const kindLabel = {refused: "⛔ refused", confirm: "⏳ asked for YES", sent: "✅ sent",
+  demo_sent: "✅ confirmed (demo, not sent)", screened: "screened only", scan: "screened",
+  followup: "follow-up", cancelled: "cancelled"};
 let after = 0, first = true;
 async function poll() {
   try {
@@ -223,16 +237,20 @@ async function poll() {
       item.className = "item" + (first ? "" : " fresh");
       const v = ev.result?.verdict;
       item.innerHTML = `<div class="who"><span>📱 ${esc(ev.sender)} · ${new Date(ev.ts * 1000).toLocaleTimeString()}</span>
-        ${v ? `<span class="pill verdict ${esc(v)}">${esc(v)}</span>` : ""}</div><div>${esc(ev.text)}</div>`;
+        ${v ? `<span class="pill verdict ${esc(v)}">${esc(v)}</span>` : ""}</div><div>${esc(ev.text)}</div>
+        <div class="who" style="margin-top:4px"><span>${esc(kindLabel[ev.kind] || "")}</span></div>`;
       feed.prepend(item);
-      if (!first && ev.result) renderResult(ev.result, ev.reply, `from iMessage (${ev.sender})`);
+      if (!first && ev.result) renderResult(ev.result, ev.reply, `from iMessage (${ev.sender})`, ev.kind);
     }
   } catch (e) {}
   first = false;
   setTimeout(poll, 1500);
 }
 fetch("/api/status").then((r) => r.json()).then((s) => {
-  if (Object.values(s.mocks).some(Boolean)) $("mockBadge").hidden = false;
+  const parts = [`Auditor: ${s.mode.auditor}`, `Agent: ${s.mode.agent}`, `transfers: ${s.mode.transfers}`];
+  $("modeBadge").textContent = parts.join(" · ");
+  $("modeBadge").classList.toggle("mock", s.mode.auditor === "mock" || s.mode.transfers === "demo");
+  $("modeBadge").hidden = false;
   if (s.handle) {
     $("handleBadge").textContent = "📱 Text Warden: " + s.handle;
     $("handleBadge").hidden = false;

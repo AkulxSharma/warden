@@ -3,7 +3,7 @@
     python3 -m front.dashboard            # http://localhost:8787
 
 GET  /                     the page
-GET  /api/status           whether the Auditor / Agent are mocks
+GET  /api/status           Auditor / Agent / transfer mode, agent handle
 POST /api/message {text, session}   same path as an iMessage
 GET  /api/events?after=N   exchanges from every channel (live iMessage feed)
 """
@@ -35,7 +35,7 @@ class Handler(BaseHTTPRequestHandler):
         if url.path == "/":
             self._send(200, PAGE.read_bytes(), "text/html; charset=utf-8")
         elif url.path == "/api/status":
-            self._send(200, {"mocks": services.using_mocks(),
+            self._send(200, {"mode": services.status(),
                              "handle": os.environ.get("WARDEN_AGENT_HANDLE", "")})
         elif url.path == "/api/events":
             after = int(parse_qs(url.query).get("after", ["0"])[0])
@@ -60,9 +60,11 @@ class Handler(BaseHTTPRequestHandler):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Warden dashboard")
-    ap.add_argument("--port", type=int, default=8787)
+    ap.add_argument("--port", type=int, default=int(os.environ.get("PORT", 8787)))
+    ap.add_argument("--host", default=os.environ.get("HOST", "127.0.0.1"),
+                    help="0.0.0.0 when deployed behind a public host")
     args = ap.parse_args(argv)
-    server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
+    server = ThreadingHTTPServer((args.host, args.port), Handler)
     print(f"[warden] dashboard on http://localhost:{args.port}")
     try:
         server.serve_forever()
