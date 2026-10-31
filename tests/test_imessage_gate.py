@@ -55,5 +55,24 @@ class DecideTests(unittest.TestCase):
         self.assertEqual(self.decide("I told him hey warden yesterday"), ("ignore", None))
 
 
+class GreetingTests(unittest.TestCase):
+    def test_greeting_lists_every_predefined_wallet(self):
+        import aliases
+        text = imessage.greeting()
+        for name in aliases.ALIASES:
+            self.assertIn(name, text)
+
+    def test_greeting_has_disclaimer_instructions_and_fits_a_text(self):
+        text = imessage.greeting()
+        self.assertIn("Hey Warden".split()[1], text)            # mentions Warden
+        self.assertIn("End Warden", text)
+        self.assertIn("Risk signal, not a guarantee", text)
+        self.assertNotIn("safe", text.lower().replace("not a guarantee", ""))
+        self.assertLess(len(text), 900)
+
+    def test_greeting_never_contains_addresses_or_numbers(self):
+        self.assertNotIn("0x", imessage.greeting().replace("0x address", ""))
+
+
 if __name__ == "__main__":
     unittest.main()
