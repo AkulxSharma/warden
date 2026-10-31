@@ -229,7 +229,7 @@ def run(allowed, public, dry_run, poll, self_chat=False, agent_handle=""):
             text = body
             try:
                 out = handle_message(text, session=chat_key, channel="imessage", sender=mask(handle),
-                                     can_transfer=normalize(handle) in allowed_norm)
+                                     can_transfer=True)  # anyone who started the chat with "Hey Warden"
             except Exception as exc:  # one bad message must not take the handle down
                 print(f"[warden] error on message {rowid}: {exc!r}", file=sys.stderr)
                 continue
