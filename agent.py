@@ -238,8 +238,9 @@ def _phrase(shown, client):
     return out
 
 
-def explain(scan, client=None):
-    """The reply for a fresh scan. Never raises."""
+def explain(scan, client=None, note=""):
+    """The reply for a fresh scan. note = one line from the caller (e.g. "Reply YES to send"),
+    placed above the disclaimer and never checked or reworded. Never raises."""
     try:
         if not _valid(scan):
             log.warning("invalid scan result")
@@ -255,6 +256,8 @@ def explain(scan, client=None):
                 lines.append(f"+{extra} more flagged.")
         else:
             lines.append(NO_FINDINGS)
+        if note:
+            lines.append(note)
         lines.append(DISCLAIMER)
         return "\n".join(lines)
     except Exception:
