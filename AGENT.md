@@ -78,7 +78,7 @@ Put these in `.env` (gitignored) or the environment.
 | `SEPOLIA_RPC_URL` | Defaults to a public Sepolia RPC. |
 | `WARDEN_MAX_ETH` | Per-transfer cap, default `0.01`. |
 | `ANTHROPIC_API_KEY` | For the wording. Without it every reply still works, using the Auditor's own messages. |
-| `WARDEN_AGENT_MODEL` | Defaults to `claude-opus-5-5`. See the numbers below. |
+| `WARDEN_AGENT_MODEL` | Defaults to `claude-opus-5-5`; the demo runs `claude-sonnet-5-5`. See the numbers below. |
 | `WARDEN_AGENT_TOKEN`, `WARDEN_AGENT_HOST`, `WARDEN_AGENT_PORT` | HTTP server only. |
 
 ## Running it
