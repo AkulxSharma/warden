@@ -167,7 +167,7 @@ def run(allowed, public, dry_run, poll, self_chat=False, agent_handle=""):
           f"{' (dry run)' if dry_run else ''}. Ctrl+C to stop.")
 
     allowed_norm = {normalize(h) for h in allowed}
-    seen, recent, per_sender, open_chats = set(), {}, {}, set()
+    seen, recent, per_sender, open_chats = set(), {}, {}, {}
     while True:
         rows = db.execute(NEW_MESSAGES, (last,)).fetchall()
         for rowid, text, body, from_me, handle, chat_guid, style in rows:
