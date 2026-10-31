@@ -5,7 +5,8 @@ import unittest
 from pathlib import Path
 
 from front import mock_agent, mock_auditor, pipeline
-from front.imessage import decode_attributed_body, mask
+from front import config
+from front.imessage import decode_attributed_body, mask, wants_warden
 from front.parse import SEPOLIA, parse
 
 LOW, MED, HIGH = (f["target"] for f in mock_auditor._FIXTURES.values())
@@ -98,6 +99,21 @@ class IMessageHelpersTest(unittest.TestCase):
         blob = b"\x04\x0bstreamtyped\x81\xe8\x03\x84\x01@\x84\x84\x84\x12NSAttributedString\x00\x84\x84\x08NSObject\x00\x85\x92\x84\x84\x84\x08NSString\x01\x94\x84\x01+" \
                + bytes([len(text)]) + text.encode() + b"\x86\x84"
         self.assertEqual(decode_attributed_body(blob), text)
+
+    def test_public_mode_skips_normal_texts(self):
+        self.assertTrue(wants_warden(f"is {HIGH} legit?"))
+        self.assertTrue(wants_warden("hey warden"))
+        self.assertTrue(wants_warden("https://sepolia.etherscan.io/address/0x123"))
+        self.assertFalse(wants_warden("hi"))
+        self.assertFalse(wants_warden("dinner at 7?"))
+
+    def test_load_env(self):
+        with tempfile.TemporaryDirectory() as d:
+            env = Path(d) / ".env"
+            env.write_text("# comment\nWARDEN_TEST_A=+15550001111 # note\nWARDEN_TEST_B='x@y.com, +15552223333'\n")
+            config.load_env(env)
+            self.assertEqual(config.os.environ["WARDEN_TEST_A"], "+15550001111")
+            self.assertEqual(config.handles("WARDEN_TEST_B"), ["x@y.com", "+15552223333"])
 
     def test_mask(self):
         self.assertEqual(mask("+15551234567"), "…4567")

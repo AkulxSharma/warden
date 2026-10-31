@@ -1,4 +1,5 @@
-"""Warden iMessage bot. Runs on a Mac signed into the Warden Apple ID in Messages.
+"""Warden iMessage bot. Runs on a Mac whose Messages is signed into the agent
+handle (WARDEN_AGENT_HANDLE in .env).
 
 Reads new incoming messages from ~/Library/Messages/chat.db (read-only),
 runs each through the shared pipeline, and replies in the same chat through
@@ -8,13 +9,18 @@ Needs, once:
   - Full Disk Access for the app running this (Terminal, iTerm, ...), to read chat.db.
   - Automation permission for that app to control Messages (macOS asks on first send).
 
-Usage:
-  python3 -m front.imessage --allow +15551234567,you@icloud.com
-  caffeinate -i python3 -m front.imessage --any-sender   # judging: dedicated Warden Apple ID only
-  python3 -m front.imessage --allow <your number> --self-chat   # demo: text yourself
-  python3 -m front.imessage --dry-run ...     # print replies, send nothing
+Settings come from .env (see .env.example):
+  WARDEN_AGENT_HANDLE     the number people text (shown in logs, masked)
+  WARDEN_TESTER_HANDLES   testing phones, always answered
+  WARDEN_MODE             test: testers only
+                          public: also strangers, but only for Warden-looking
+                          texts (address, link, "warden") or chats already
+                          talking to Warden, so the owner's normal texts are ignored
 
-Allowed senders can also come from WARDEN_ALLOWED_HANDLES (comma-separated).
+Usage:
+  python3 -m front.imessage                   # uses .env
+  caffeinate -i python3 -m front.imessage --mode public   # judging
+  python3 -m front.imessage --dry-run         # print replies, send nothing
 """
 import argparse
 import os
@@ -24,6 +30,8 @@ import sys
 import time
 from pathlib import Path
 
+from . import config
+from .parse import parse
 from .pipeline import handle_message
 
 CHAT_DB = Path.home() / "Library" / "Messages" / "chat.db"
@@ -111,15 +119,23 @@ def send(text, chat_guid, handle):
     return False
 
 
-def run(allowed, any_sender, dry_run, poll, self_chat=False):
+def wants_warden(text):
+    """Would a stranger's text be meant for Warden? Used in public mode."""
+    return parse(text).kind in {"scan", "tx_hash", "ens", "link_no_address"} or "warden" in text.lower()
+
+
+def run(allowed, public, dry_run, poll, self_chat=False, agent_handle=""):
     db = connect()
     last = db.execute("SELECT IFNULL(MAX(ROWID), 0) FROM message").fetchone()[0]
-    who = "anyone" if any_sender else ", ".join(mask(h) for h in allowed)
-    print(f"[warden] listening for iMessages from {who}"
+    who = ", ".join(mask(h) for h in allowed) or "no testers"
+    if public:
+        who += " + anyone texting an address, link or 'warden'"
+    print(f"[warden] agent handle {mask(agent_handle) if agent_handle else '(WARDEN_AGENT_HANDLE not set)'}")
+    print(f"[warden] answering {who}"
           f"{' (dry run)' if dry_run else ''}. Ctrl+C to stop.")
 
     allowed_norm = {normalize(h) for h in allowed}
-    seen, recent, per_sender = set(), {}, {}
+    seen, recent, per_sender, open_chats = set(), {}, {}, set()
     while True:
         rows = db.execute(NEW_MESSAGES, (last,)).fetchall()
         for rowid, text, body, from_me, handle, chat_guid, style in rows:
@@ -134,8 +150,13 @@ def run(allowed, any_sender, dry_run, poll, self_chat=False):
                 continue  # our own outgoing messages
             if style == GROUP_CHAT_STYLE:
                 continue
-            if not any_sender and normalize(handle) not in allowed_norm:
-                continue
+            chat_key = chat_guid or handle
+            if normalize(handle) not in allowed_norm:
+                if not public:
+                    continue
+                if chat_key not in open_chats and not wants_warden(text):
+                    continue  # a normal text to the owner's number, not for Warden
+            open_chats.add(chat_key)
             key = (chat_guid or handle, text)
             if time.time() - recent.get(key, 0) < 15:
                 continue  # self-chat can store one text as two rows
@@ -161,10 +182,10 @@ def run(allowed, any_sender, dry_run, poll, self_chat=False):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Warden iMessage bot")
-    ap.add_argument("--allow", default=os.environ.get("WARDEN_ALLOWED_HANDLES", ""),
-                    help="comma-separated phone numbers or emails to answer")
-    ap.add_argument("--any-sender", action="store_true",
-                    help="answer anyone (only on a dedicated Warden Apple ID)")
+    ap.add_argument("--allow", default=",".join(config.handles("WARDEN_TESTER_HANDLES")),
+                    help="comma-separated tester numbers or emails (default: WARDEN_TESTER_HANDLES)")
+    ap.add_argument("--mode", choices=("test", "public"), default=os.environ.get("WARDEN_MODE", "test") or "test",
+                    help="test: testers only; public: also strangers sending Warden-looking texts")
     ap.add_argument("--self-chat", action="store_true",
                     help="also answer texts you send to an allowed handle (texting your own number)")
     ap.add_argument("--dry-run", action="store_true", help="print replies instead of sending")
@@ -172,11 +193,12 @@ def main(argv=None):
     args = ap.parse_args(argv)
 
     allowed = [h.strip() for h in args.allow.split(",") if h.strip()]
-    if not allowed and not args.any_sender:
-        sys.exit("Refusing to start without --allow or --any-sender, so the bot never "
-                 "answers people who weren't part of the demo.")
+    if not allowed and args.mode == "test":
+        sys.exit("No testers set. Put your number in WARDEN_TESTER_HANDLES in .env "
+                 "(or pass --allow), or run with --mode public.")
     try:
-        run(allowed, args.any_sender, args.dry_run, args.poll, args.self_chat)
+        run(allowed, args.mode == "public", args.dry_run, args.poll, args.self_chat,
+            os.environ.get("WARDEN_AGENT_HANDLE", ""))
     except KeyboardInterrupt:
         print("\n[warden] stopped")
 

@@ -11,6 +11,8 @@ the front end changes:
 import importlib
 import os
 
+from . import config  # noqa: F401  (loads .env)
+
 DEFAULTS = {
     "WARDEN_AUDITOR": "front.mock_auditor:audit",
     "WARDEN_AGENT_REPLY": "front.mock_agent:reply",

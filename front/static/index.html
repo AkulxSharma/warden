@@ -90,7 +90,8 @@
 <header>
   <h1>🛡 Warden</h1>
   <span class="tag">Text an address. Get a risk signal before you pay.</span>
-  <span class="badge net">Sepolia testnet</span>
+  <span class="badge net" id="handleBadge" hidden></span>
+  <span class="badge">Sepolia testnet</span>
   <span class="badge mock" id="mockBadge" hidden>mock Auditor + Agent</span>
 </header>
 
@@ -232,6 +233,11 @@ async function poll() {
 }
 fetch("/api/status").then((r) => r.json()).then((s) => {
   if (Object.values(s.mocks).some(Boolean)) $("mockBadge").hidden = false;
+  if (s.handle) {
+    $("handleBadge").textContent = "📱 Text Warden: " + s.handle;
+    $("handleBadge").hidden = false;
+    document.querySelector(".phone .sub").textContent = s.handle + " · try it here";
+  }
 });
 poll();
 </script>

@@ -9,6 +9,7 @@ GET  /api/events?after=N   exchanges from every channel (live iMessage feed)
 """
 import argparse
 import json
+import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -34,7 +35,8 @@ class Handler(BaseHTTPRequestHandler):
         if url.path == "/":
             self._send(200, PAGE.read_bytes(), "text/html; charset=utf-8")
         elif url.path == "/api/status":
-            self._send(200, {"mocks": services.using_mocks()})
+            self._send(200, {"mocks": services.using_mocks(),
+                             "handle": os.environ.get("WARDEN_AGENT_HANDLE", "")})
         elif url.path == "/api/events":
             after = int(parse_qs(url.query).get("after", ["0"])[0])
             self._send(200, {"events": read_events(after)})
