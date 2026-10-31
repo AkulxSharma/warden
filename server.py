@@ -15,6 +15,8 @@ import os
 import sys
 import threading
 import time
+import urllib.error
+import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -32,6 +34,7 @@ SCHEMA_PATH = Path(__file__).resolve().parent / "schema" / "auditor-output.schem
 SCHEMA = json.loads(SCHEMA_PATH.read_text()) if SCHEMA_PATH.exists() else None
 
 PAGE = Path(__file__).resolve().parent / "dashboard.html"
+AGENT_URL = os.environ.get("WARDEN_AGENT_URL", "http://127.0.0.1:8787")  # front.dashboard, the chat backend
 WALLET_TTL = 4      # seconds the wallet snapshot is reused (the page polls every 5)
 CACHE_TTL = 30      # seconds a successful result is reused for the same (address, chainId)
 RATE_LIMIT = 60     # /screen requests per client per minute
@@ -115,10 +118,44 @@ class Handler(BaseHTTPRequestHandler):
         # ngrok-skip-browser-warning header
         self.send_response(204)
         self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "ngrok-skip-browser-warning, content-type")
         self.send_header("Access-Control-Max-Age", "600")
         self.end_headers()
+
+    def do_POST(self):
+        """Forward the in-page chat to the local agent (front.dashboard). Web chat never sends money."""
+        if urlparse(self.path).path != "/api/message":
+            return self._json(404, {"error": "not found"})
+        length = min(int(self.headers.get("Content-Length") or 0), 4096)
+        body = self.rfile.read(length)
+        forwarded = self.headers.get("X-Forwarded-For", "").split(",")[0].strip() or self.client_address[0]
+        if _rate_limited("chat:" + forwarded, time.time()):
+            return self._json(429, {"reply": "Too many messages. Wait a minute and try again.",
+                                    "result": None, "kind": "rate_limited"})
+        req = urllib.request.Request(AGENT_URL + "/api/message", data=body, method="POST",
+                                     headers={"Content-Type": "application/json", "X-Forwarded-For": forwarded})
+        try:
+            with urllib.request.urlopen(req, timeout=30) as res:
+                payload, status = res.read(), res.status
+        except (urllib.error.URLError, OSError):
+            return self._json(502, {"reply": "The agent is offline right now. Try again in a minute.",
+                                    "result": None, "kind": "agent_offline"})
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(payload)))
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+        self.wfile.write(payload)
+
+    def _json(self, status, body):
+        data = json.dumps(body).encode()
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+        self.wfile.write(data)
 
     def do_GET(self):
         if urlparse(self.path).path in ("/", "/dashboard") and PAGE.exists():

@@ -44,6 +44,23 @@
   a { color: var(--accent); }
   .foot { color: var(--muted); font-size: 12px; margin-top: 14px; }
   .scroll { overflow-x: auto; }
+  .chat { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px; margin-bottom: 24px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 10px; }
+  .chip { font: inherit; font-size: 13px; padding: 6px 10px; border-radius: 999px; cursor: pointer;
+          border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
+  .chip:hover { border-color: var(--accent); }
+  .msgs { max-height: 280px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+  .msg { padding: 8px 12px; border-radius: 10px; max-width: 92%; white-space: pre-wrap; word-break: break-word; font-size: 14px; }
+  .msg.me { align-self: flex-end; background: var(--accent); color: #fff; }
+  .msg.bot { align-self: flex-start; background: var(--bg); border: 1px solid var(--line); }
+  .msg.refused { border-color: var(--bad); }
+  .msg.wait { color: var(--muted); }
+  #chatForm { display: flex; gap: 8px; }
+  #chatInput { flex: 1; font: inherit; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--line);
+               background: var(--bg); color: var(--ink); min-width: 0; }
+  #chatForm button { font: inherit; padding: 9px 16px; border-radius: 8px; border: 0; cursor: pointer;
+                     background: var(--accent); color: #fff; }
+  .hint { color: var(--muted); font-size: 12px; margin: 8px 0 0; }
 </style>
 </head>
 <body>
@@ -52,7 +69,17 @@
   <p class="sub">Sepolia test ether only. It has no real value. Refreshes every 5 seconds.</p>
   <div id="banner" class="banner">Loading…</div>
   <div id="cards" class="cards"></div>
-  <h2>Recent transfers</h2>
+  <h2>Try the agent</h2>
+  <div class="chat">
+    <div class="chips" id="chips"></div>
+    <div class="msgs" id="chatLog"></div>
+    <form id="chatForm">
+      <input id="chatInput" placeholder="Try: vault.eth, or send 0.001 to drainer.eth" autocomplete="off" spellcheck="false">
+      <button type="submit">Send</button>
+    </form>
+    <p class="hint">This chat only checks risk. Real transfers happen over iMessage, from the agent's own wallet. Risk signal, not a guarantee.</p>
+  </div>
+  <h2>Recent transactions</h2>
   <div class="scroll">
     <table>
       <thead><tr><th>Time</th><th>From</th><th>To</th><th>Amount</th><th>Status</th><th>Proof</th></tr></thead>
@@ -62,6 +89,8 @@
   <p class="foot" id="foot"></p>
 </main>
 <script>
+  var API = (window.WARDEN_API || "").replace(/\/$/, "");
+  var HDRS = API ? { headers: { "ngrok-skip-browser-warning": "1" } } : {};
   function el(tag, text, cls) {
     var e = document.createElement(tag);
     if (text !== undefined) e.textContent = text;
@@ -83,6 +112,14 @@
       c.appendChild(el("div", w.balanceEth + " ETH", "bal"));
       var a = el("div", undefined, "addr"); a.appendChild(link(w.explorer, w.address)); c.appendChild(a);
       cards.appendChild(c);
+    });
+    var chips = document.getElementById("chips");
+    chips.replaceChildren();
+    d.wallets.filter(function (w) { return w.kind === "target"; }).forEach(function (w) {
+      var b = el("button", w.alias, "chip"); b.type = "button";
+      b.title = w.role;
+      b.addEventListener("click", function () { send(w.alias); });
+      chips.appendChild(b);
     });
     var rows = document.getElementById("rows");
     rows.replaceChildren();
@@ -126,8 +163,41 @@
     document.getElementById("foot").textContent =
       d.transfersError ? "Transfer history unavailable right now: " + d.transfersError : "";
   }
+  var sid;
+  try {
+    sid = sessionStorage.getItem("wsid");
+    if (!sid) { sid = Math.random().toString(36).slice(2); sessionStorage.setItem("wsid", sid); }
+  } catch (e) { sid = "anon" + Math.random().toString(36).slice(2); }
+  function addMsg(text, cls) {
+    var log = document.getElementById("chatLog");
+    var m = el("div", text, "msg " + cls);
+    log.appendChild(m);
+    log.scrollTop = log.scrollHeight;
+    return m;
+  }
+  function send(text) {
+    if (!text) return;
+    addMsg(text, "me");
+    var wait = addMsg("Checking…", "bot wait");
+    var headers = { "Content-Type": "application/json" };
+    if (API) headers["ngrok-skip-browser-warning"] = "1";
+    fetch(API + "/api/message", { method: "POST", headers: headers, body: JSON.stringify({ text: text, session: sid }) })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        wait.textContent = d.reply || "No reply.";
+        wait.className = "msg bot" + (d.kind === "refused" ? " refused" : "");
+      })
+      .catch(function () { wait.textContent = "Could not reach the agent."; wait.className = "msg bot refused"; });
+  }
+  document.getElementById("chatForm").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var input = document.getElementById("chatInput");
+    var text = input.value.trim();
+    input.value = "";
+    send(text);
+  });
   function tick() {
-    fetch("/wallets").then(function (r) { return r.json(); }).then(function (d) {
+    fetch(API + "/wallets", HDRS).then(function (r) { return r.json(); }).then(function (d) {
       if (d.error) throw new Error(d.error);
       render(d);
     }).catch(function (e) {
