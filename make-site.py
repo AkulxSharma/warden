@@ -28,11 +28,9 @@ def main(src_dir, out_dir, api, handle=""):
     # config for the page
     h = swap(h, "<head>", "<head>\n<script>window.WARDEN_API = %s; window.WARDEN_HANDLE = %s;</script>"
              % (json.dumps(api), json.dumps(handle)))
-    # the live iMessage feed is right-aligned, like outgoing message bubbles
-    h = swap(h, "</style>", "  .feed { align-items: flex-end; }\n"
-             "  .feed .item { margin-left: auto; max-width: 88%; text-align: right; }\n"
-             "  .feed .who { justify-content: flex-end; gap: 12px; }\n"
-             "  .feed .empty { text-align: right; align-self: stretch; }\n</style>")
+    # the whole live iMessage feed box sits in the right-hand column and stays in view while scrolling
+    h = swap(h, "</style>", "  aside .panel { position: sticky; top: 24px; }\n"
+             "  aside .feed { max-height: calc(100vh - 150px); }\n</style>")
     # the input hint: how to try it over iMessage (or a name when no handle was given)
     hint = (f"Paste an address, or text “Hey Warden” to {handle} on iMessage" if handle
             else "Paste an address or a name like vault.eth")
@@ -48,11 +46,17 @@ def main(src_dir, out_dir, api, handle=""):
     h = h.replace('href="/img/icon.png"', 'href="img/icon.png"')
     h = h.replace('src="/img/icon.png"', 'src="img/icon.png"')
     h = h.replace('src="/img/hero.png"', 'src="img/hero.png"')
-    # layout: one column now that the chat panel is gone
-    h = swap(h, "grid-template-columns: minmax(0, 1fr) 380px;", "grid-template-columns: minmax(0, 1fr);")
-    h = swap(h, "max-width: 1200px;", "max-width: 980px;")
-    # remove the whole chat panel (phone with the message thread and input)
-    h = re.sub(r"\n  <aside>.*?</aside>", "", h, count=1, flags=re.S)
+    # layout: keep two columns. The chat panel (phone with the message thread and input) is removed, and
+    # the Live iMessage feed box moves from the left column into the right-hand column in its place.
+    feed_re = r'\n    <section class="panel">\n      <h2 class="label">Live iMessage feed</h2>.*?</section>\n'
+    m = re.search(feed_re, h, flags=re.S)
+    if not m:
+        sys.exit("make-site: live feed section not found")
+    feed = m.group(0).strip("\n")
+    h = h.replace(m.group(0), "\n", 1)
+    h, n = re.subn(r"\n  <aside>.*?</aside>", lambda _: "\n  <aside>\n" + feed + "\n  </aside>", h, count=1, flags=re.S)
+    if n != 1:
+        sys.exit("make-site: aside not found")
     if "chatForm" in h.split("<script>", 1)[0]:
         sys.exit("make-site: chat panel markup still present")
 
