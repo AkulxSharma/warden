@@ -10,6 +10,8 @@ ALIASES = {
     # Placeholder receiver: a freshly generated address nobody holds a key for.
     # Akul: replace with your own Sepolia address before the demo.
     "akul.eth": "0xE54Ea6a50DD6be272aEF623238E5d1DB66e9563B",
+    # Intentionally dangerous test contract (selfdestruct), for the HIGH-risk refusal demo.
+    "drainer.eth": "0x48F8686E6f0f4eB99a9ea89ee68C2ce93a4fBf32",
 }
 
 NAME = re.compile(r"(?<![\w.\-])[a-z0-9][a-z0-9\-]*\.eth(?![\w.])", re.I)

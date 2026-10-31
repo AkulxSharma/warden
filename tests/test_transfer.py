@@ -601,3 +601,14 @@ class AliasTests(unittest.TestCase):
         rig = Rig()
         self.assertIn("Ethereum on Sepolia only", rig.say("send 0.01 btc to akul.eth"))
         self.assertEqual(rig.audit_calls, [])
+
+    def test_drainer_alias_is_refused_as_high_and_nothing_is_sent(self):
+        drainer = transfer.aliases.resolve("drainer.eth")
+        high = {"id": "selfdestruct-opcode", "severity": "high", "message": "bytecode contains a SELFDESTRUCT opcode"}
+        rig = Rig(auditor=lambda address, chain: scan_for(address, "HIGH", [high], verified=False, score=65))
+        reply = rig.say("send 0.001 to drainer.eth")
+        self.assertEqual(rig.audit_calls, [(drainer, 11155111)])
+        self.assertIn("Not sent", reply)
+        self.assertNotIn("Reply YES", reply)
+        self.assertIn("Nothing is waiting", rig.say("YES"))
+        self.assertEqual(rig.sent, [])
