@@ -43,7 +43,7 @@ NO_PENDING = "There's nothing waiting for a YES. Text \"send 0.01 to 0x…\" to 
 CANCELLED = "Cancelled. Nothing was sent."
 EXPIRED = "That request expired, so nothing was sent. Send it again to re-check the address."
 NO_AMOUNT = "How much? Text it like \"send 0.01 to 0x…\" (Sepolia ETH)."
-NOT_ALLOWED = ("\n\nTransfers are limited to the team's test phones, so this was a risk check only. "
+NOT_ALLOWED = ("\n\nThis chat only checks risk. Text the Warden iMessage line to send. "
                "Nothing was sent.")
 DEMO_SENT = ("Confirmed, and the risk gate passed. Demo mode: no test wallet is connected, "
              "so no transaction was sent.")
