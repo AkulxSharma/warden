@@ -54,10 +54,28 @@ RATE_LIMIT = 10   # replies per sender per minute
 ACTIVATION = re.compile(r"^\s*hey[\s,!.]+warden\b[\s,.!:;-]*", re.I)
 END = re.compile(r"^\s*(end|stop|bye)\s+warden\b", re.I)
 CHAT_IDLE_SECONDS = 1800   # a chat that has been quiet this long needs "Hey Warden" again
-GREETING = ("Warden here. I check an address before you pay it. Text \"send 0.001 to akul.eth\" "
-            "or just an address to screen it. Text \"End Warden\" when you're done. "
-            "Sepolia testnet only. Risk signal, not a guarantee.")
 GOODBYE = "Warden session ended. Text \"Hey Warden\" to start again."
+
+# One-line description of each predefined demo name, shown in the first reply.
+ROLES = {
+    "akul.eth": "a normal receiving address",
+    "andrew.eth": "the agent's own wallet",
+    "drainer.eth": "a contract that can self-destruct",
+    "vault.eth": "a verified vault with several bugs",
+    "rugpull.eth": "a token whose owner can mint and blacklist",
+    "proxy.eth": "an upgradeable proxy",
+    "phisher.eth": "a wallet that trusts tx.origin",
+}
+
+
+def greeting():
+    """First reply after "Hey Warden": what Warden does and every predefined name to try."""
+    names = "\n".join(f"- {name}: {ROLES[name]}" if name in ROLES else f"- {name}" for name in aliases.ALIASES)
+    return ("Warden here. I check an address before you pay it.\n\n"
+            f"Predefined wallets you can try:\n{names}\n\n"
+            "Text e.g. \"send 0.001 to akul.eth\", or paste any 0x address to screen it. "
+            "Text \"End Warden\" when you're done.\n"
+            "Sepolia testnet only. Risk signal, not a guarantee.")
 
 
 def decide(text, chat_key, open_chats, now):
