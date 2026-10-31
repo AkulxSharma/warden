@@ -13,8 +13,8 @@ Sepolia test ETH only. Anything unclear, failed or unverifiable means no send.
                                 # with header X-Warden-Token; needs WARDEN_AGENT_TOKEN
 
 Settings (env or .env): WARDEN_ALLOWED_SENDERS (comma list of handles), WARDEN_AUDITOR_URL,
-WARDEN_USE_FIXTURES=1 (demo: addresses starting 0x1/0x2/0x3 use Akul's LOW/MEDIUM/HIGH
-fixtures), SEPOLIA_PRIVATE_KEY, SEPOLIA_RPC_URL, WARDEN_MAX_ETH, ANTHROPIC_API_KEY.
+WARDEN_USE_FIXTURES=1 (demo: only 0x1111..., 0x2222..., 0x3333... get Akul's LOW/MEDIUM/HIGH
+fixtures, every other address is refused), SEPOLIA_PRIVATE_KEY, SEPOLIA_RPC_URL, WARDEN_MAX_ETH, ANTHROPIC_API_KEY.
 """
 import hmac
 import json
@@ -64,8 +64,10 @@ class AuditorError(Exception):
 
 
 def norm_handle(handle):
-    """Phone numbers compare by digits, everything else by lowercase text."""
+    """Phone numbers compare by digits, everything else by lowercase text. Bridge prefixes such as
+    "tel:" or "iMessage;-;" are dropped."""
     text = str(handle).strip().lower()
+    text = re.sub(r"^(?:tel:|mailto:)", "", text).rsplit(";", 1)[-1].strip()
     digits = re.sub(r"[\s().\-]", "", text)
     return digits if re.fullmatch(r"\+?\d{7,15}", digits) else text
 
@@ -170,13 +172,16 @@ def http_auditor(base_url, timeout=AUDITOR_TIMEOUT):
     return call
 
 
-def fixture_auditor(directory=FIXTURE_DIR):
-    names = {"1": "low", "2": "medium", "3": "high"}
+DEMO_ADDRESSES = {"0x" + digit * 40: name for digit, name in (("1", "low"), ("2", "medium"), ("3", "high"))}
 
+
+def fixture_auditor(directory=FIXTURE_DIR):
+    """Demo data for exactly the three demo addresses. Any other address raises, so a real address
+    can never be waved through by a fixture."""
     def call(address, chain_id):
-        name = names.get(address[2])
+        name = DEMO_ADDRESSES.get(address.lower())
         if name is None:
-            raise AuditorError("demo mode: only addresses starting 0x1, 0x2 or 0x3 have a fixture")
+            raise AuditorError("demo mode: only the three demo addresses have a fixture")
         scan = json.loads((Path(directory) / f"{name}.json").read_text(encoding="utf-8"))
         scan["target"], scan["chainId"] = address, chain_id
         return scan
@@ -207,6 +212,7 @@ class Warden:
         self.auditor, self.send, self.clock, self.demo = auditor, send, clock, demo
         self.explain, self.answer = explain, answer
         self._send_lock = threading.Lock()
+        self._ignored = set()
         self.pending = {}  # sender -> Pending, one per sender
         self.last = {}     # sender -> {"scan", "history"} for follow-up questions
 
@@ -214,6 +220,9 @@ class Warden:
         """Reply text, or None when the sender is not on the allowlist. Never raises."""
         who = norm_handle(sender)
         if who not in self.allowed:
+            if who not in self._ignored and len(self._ignored) < 100:
+                self._ignored.add(who)  # once per sender: shows the exact string to allowlist
+                log.warning("ignored sender %r: not in WARDEN_ALLOWED_SENDERS", who)
             return None
         try:
             return self._handle(who, text)

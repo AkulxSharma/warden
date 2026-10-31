@@ -208,6 +208,24 @@ class FlowTests(unittest.TestCase):
         rig = Rig(allowed=["Bob@Example.com"])
         self.assertIsNotNone(rig.say("hi", who="bob@example.COM"))
 
+    def test_bridge_prefixes_are_ignored_when_matching(self):
+        rig = Rig(allowed=["+14155550100", "bob@example.com"])
+        for sender in ("tel:+14155550100", "iMessage;-;+14155550100", "SMS;-;+1 (415) 555-0100",
+                       "any;+;+14155550100", "mailto:Bob@Example.com", "iMessage;-;bob@example.com"):
+            self.assertIsNotNone(rig.say("hi", who=sender), sender)
+        for sender in ("tel:+14155550101", "iMessage;-;eve@example.com", ";", ""):
+            self.assertIsNone(rig.say("hi", who=sender), sender)
+
+    def test_an_ignored_sender_is_logged_once_so_it_can_be_allowlisted(self):
+        rig = Rig()
+        with self.assertLogs("warden.transfer", "WARNING") as logs:
+            rig.say("hi", who="+19998887777")
+            rig.say("hi again", who="+19998887777")
+            rig.say("hi", who="eve@example.com")
+        self.assertEqual(len(logs.records), 2)
+        self.assertIn("+19998887777", logs.output[0])
+        self.assertNotIn("hi", logs.records[0].getMessage().replace("ignored", "").replace("allowlist", ""))
+
     def test_low_asks_then_sends_once(self):
         rig = Rig()
         ask = rig.say(f"send 0.01 to {A_LOW}")
@@ -473,8 +491,13 @@ class AuditorClientTests(unittest.TestCase):
             scan = call(address, 11155111)
             self.assertEqual((scan["verdict"], scan["target"]), (verdict, address))
             self.assertTrue(transfer.check_scan(scan))
-        with self.assertRaises(transfer.AuditorError):
-            call("0x9999999999999999999999999999999999999999", 11155111)
+        for other in ("0x9999999999999999999999999999999999999999", "0x1" + "a" * 39, "0x2" + "b" * 39,
+                      "0x3" + "0" * 39, "0x" + "1" * 39 + "2"):         # look-alikes of the demo addresses
+            with self.assertRaises(transfer.AuditorError, msg=other):
+                call(other, 11155111)
+            rig = Rig(auditor=call)
+            self.assertIn("did not send anything", rig.say(f"send 0.01 to {other}"))
+            self.assertEqual(rig.sent, [])
 
     def test_default_warden_fails_closed(self):
         env = {"WARDEN_ALLOWED_SENDERS": "a@x.com, +1 415 555 0100,", "WARDEN_AUDITOR_URL": "",

@@ -69,7 +69,7 @@ Put these in `.env` (gitignored) or the environment.
 | --- | --- |
 | `WARDEN_ALLOWED_SENDERS` | Comma-separated handles that may talk to the Agent. Empty means everyone is ignored. |
 | `WARDEN_AUDITOR_URL` | Base URL of Akul's server. Setting it switches from demo data to the real Auditor. |
-| `WARDEN_USE_FIXTURES` | Set to `1` for demo data when no Auditor URL exists. Addresses starting `0x1`, `0x2`, `0x3` return Akul's LOW, MEDIUM and HIGH fixtures. Replies are labelled "demo data". |
+| `WARDEN_USE_FIXTURES` | Set to `1` for demo data when no Auditor URL exists. Only `0x1111...1111`, `0x2222...2222` and `0x3333...3333` return Akul's LOW, MEDIUM and HIGH fixtures; every other address is refused. Replies are labelled "demo data". |
 | `SEPOLIA_PRIVATE_KEY` | The throwaway wallet key. `python3 wallet.py new-wallet` makes one and prints only the address. |
 | `SEPOLIA_RPC_URL` | Defaults to a public Sepolia RPC. |
 | `WARDEN_MAX_ETH` | Per-transfer cap, default `0.01`. |
