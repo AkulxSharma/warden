@@ -95,6 +95,20 @@ Andrew's iMessage bot is `front/imessage.py` (it reads `~/Library/Messages/chat.
 
 When the end-to-end run passes, or when you hit a blocker or need Akul, message the Conductor session with one to three lines: what happened, the key fact (a tx hash, a verdict, an error), and what you need.
 
+## Step 7: aliases instead of long addresses (only after Steps 1-5 pass)
+
+Akul wants to text `send 0.01 to akul.eth` instead of a 0x address. Build a local alias book first. It is code-controlled and safe. Do not build real ENS lookups unless Akul asks.
+
+- The two aliases for the demo: `akul.eth` is the receiver, and `andrew.eth` is the sender (the teammate who texts the agent). Map each to a public Sepolia test address. The agent spends from its own single wallet (`SEPOLIA_PRIVATE_KEY`). For the demo story, make that funded wallet the one labelled `andrew.eth`, and make `akul.eth` a separate recipient address. Per-user wallets with separate keys are out of scope tonight.
+- Put the book in a small module (for example `aliases.py`). Public addresses are fine in code. Phone numbers and keys never go in code or the repo.
+- Resolve the alias in the intent parser, before the Auditor call. The Auditor still receives only the resolved 0x address; its contract does not change.
+- The confirmation must show both the alias and the short address, for example `akul.eth -> 0xab...12`. YES sends to the resolved address.
+- Match aliases case-insensitively and exactly otherwise, with no fuzzy matching. An unknown alias gets "I don't know that name" and the Auditor is not called.
+- Aliases change only in code or config, never by a text. A message like `alias akul.eth = 0x...` must do nothing.
+- Chain: Ethereum on Sepolia only. If someone asks for BTC or another chain, reply that Warden handles Ethereum on Sepolia only. Bitcoin is not EVM and is out of scope.
+- Tests: a known alias resolves and the Auditor is called with the 0x address; an unknown alias refuses without calling the Auditor; an alias-setting text changes nothing; the confirmation contains both the alias and the short address; BTC is rejected.
+- Tell Andrew: `front` says ENS names are not supported. It should use the same resolver so alias handling lives in one place.
+
 ## Rules that never change
 
 - No keys in the repo. `.env` is gitignored. Never paste a key into chat or a commit.
